@@ -2,31 +2,24 @@ import { useState, useRef, useEffect } from "react";
 import { supabase } from "./supabase";
 
 export default function App() {
-  const [messages, setMessages] = useState([
-    {
-      text: "Hi there! 👋 I'm Aria, your virtual support assistant. How can I assist you today?",
-      sender: "bot"
-    }
-  ]);
+  const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [user, setUser] = useState(null);
 
   const chatEndRef = useRef(null);
 
+  // 🔽 Auto scroll
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  // ✅ GET USER FROM SUPABASE
+  // ✅ Get user
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
-      if (data.user) {
-        setUser(data.user);
-      }
+      if (data.user) setUser(data.user);
     });
 
-    // 🔥 listen for login/logout
     const { data: listener } = supabase.auth.onAuthStateChange(
       (event, session) => {
         setUser(session?.user || null);
@@ -36,7 +29,40 @@ export default function App() {
     return () => listener.subscription.unsubscribe();
   }, []);
 
-  // ✅ LOGIN WITH GOOGLE (SUPABASE)
+  // ✅ LOAD CHAT HISTORY
+  const loadChatHistory = async () => {
+    if (!user) return;
+
+    const { data } = await supabase
+      .from("chat_history")
+      .select("*")
+      .eq("user_id", user.id)
+      .order("created_at", { ascending: true });
+
+    if (!data || data.length === 0) {
+      setMessages([
+        {
+          text: "Hi there! 👋 I'm Aria, your virtual support assistant. How can I assist you today?",
+          sender: "bot"
+        }
+      ]);
+      return;
+    }
+
+    const formatted = data.map(msg => ({
+      text: msg.message,
+      sender: msg.sender
+    }));
+
+    setMessages(formatted);
+  };
+
+  // 🔥 Run when user changes
+  useEffect(() => {
+    if (user) loadChatHistory();
+  }, [user]);
+
+  // ✅ LOGIN
   const login = async () => {
     await supabase.auth.signInWithOAuth({
       provider: "google"
@@ -47,6 +73,7 @@ export default function App() {
   const logout = async () => {
     await supabase.auth.signOut();
     setUser(null);
+    setMessages([]);
   };
 
   // 🔥 SEND MESSAGE
@@ -54,6 +81,7 @@ export default function App() {
     const messageToSend = customText || input;
     if (!messageToSend.trim()) return;
 
+    // show user message immediately
     setMessages(prev => [...prev, { text: messageToSend, sender: "user" }]);
     setInput("");
     setLoading(true);
@@ -66,7 +94,7 @@ export default function App() {
         },
         body: JSON.stringify({
           message: messageToSend,
-          user_id: user?.id || null   // ✅ THIS IS THE FIX
+          user_id: user?.id || null
         })
       });
 
@@ -95,7 +123,6 @@ export default function App() {
         <div style={styles.header}>
           <div>Customer Support</div>
 
-          {/* LOGIN BUTTON */}
           {!user && (
             <div style={styles.loginIcon} onClick={login}>
               <img
@@ -105,14 +132,10 @@ export default function App() {
             </div>
           )}
 
-          {/* USER */}
           {user && (
             <div style={styles.userSection}>
               {user?.user_metadata?.avatar_url ? (
-                <img
-                  src={user.user_metadata.avatar_url}
-                  style={styles.avatar}
-                />
+                <img src={user.user_metadata.avatar_url} style={styles.avatar} />
               ) : (
                 <div style={styles.fallbackAvatar}>
                   {user?.email?.charAt(0).toUpperCase()}
@@ -133,8 +156,7 @@ export default function App() {
               key={i}
               style={{
                 ...styles.messageRow,
-                justifyContent:
-                  m.sender === "user" ? "flex-end" : "flex-start"
+                justifyContent: m.sender === "user" ? "flex-end" : "flex-start"
               }}
             >
               {m.sender === "bot" && <div>🤖</div>}
@@ -155,6 +177,7 @@ export default function App() {
 
           {loading && <div style={styles.typing}>Typing...</div>}
 
+          {/* QUICK BUTTONS */}
           <div style={styles.quickActions}>
             <button onClick={() => send("Track my order")}>📦 Track</button>
             <button onClick={() => send("Refund request")}>↩️ Refund</button>
@@ -186,6 +209,8 @@ export default function App() {
     </div>
   );
 }
+
+// 🎨 STYLES
 const styles = {
   page: {
     background: "#0f172a",
@@ -205,17 +230,6 @@ const styles = {
     flexDirection: "column",
     overflow: "hidden"
   },
-  fallbackAvatar: {
-    width: "34px",
-    height: "34px",
-    borderRadius: "50%",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    fontWeight: "bold",
-    color: "white",
-    background: "linear-gradient(135deg, #6366f1, #8b5cf6)"
-  },
 
   header: {
     padding: "12px 15px",
@@ -230,12 +244,11 @@ const styles = {
     width: "30px",
     height: "30px",
     borderRadius: "50%",
-    background: "white",   
+    background: "white",
     display: "flex",
     justifyContent: "center",
     alignItems: "center",
-    cursor: "pointer",
-    boxShadow: "0 2px 6px rgba(0,0,0,0.3)" // optional nice shadow
+    cursor: "pointer"
   },
 
   userSection: {
@@ -250,6 +263,18 @@ const styles = {
     borderRadius: "50%"
   },
 
+  fallbackAvatar: {
+    width: "34px",
+    height: "34px",
+    borderRadius: "50%",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    fontWeight: "bold",
+    color: "white",
+    background: "linear-gradient(135deg,#6366f1,#8b5cf6)"
+  },
+
   logoutBtn: {
     background: "#ef4444",
     border: "none",
@@ -258,12 +283,6 @@ const styles = {
     borderRadius: "8px",
     cursor: "pointer",
     fontSize: "12px"
-  },
-
-  userInfo: {
-    textAlign: "center",
-    fontSize: "12px",
-    color: "#9ca3af"
   },
 
   chatBox: {
