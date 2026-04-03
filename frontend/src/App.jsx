@@ -158,16 +158,6 @@ export default function App() {
       <div style={styles.sidebar}>
         <h3>Chats</h3>
 
-        {conversations.map(c => (
-          <div
-            key={c.id}
-            style={styles.chatItem}
-            onClick={() => loadMessages(c.id)}
-          >
-            {c.title}
-          </div>
-        ))}
-
         <button onClick={() => {
           setMessages([
               {
@@ -179,6 +169,24 @@ export default function App() {
         }}>
           + New Chat
         </button>
+
+        <div style={{ marginTop: "10px" }}>
+          {conversations.map(c => (
+            <div
+              key={c.id}
+              style={styles.chatItem}
+              onClick={() => loadMessages(c.id)}
+            >
+              {c.title}
+            </div>
+          ))}
+        </div>
+
+        <div style={styles.sidebarBottom}>
+          <button style={styles.logoutBtn} onClick={logout}>
+            Logout
+          </button>
+        </div>
       </div>
 
       {/* MAIN CHAT */}
@@ -187,30 +195,29 @@ export default function App() {
         {/* HEADER */}
         <div style={styles.header}>
           <div>Customer Support</div>
+          
+          <div style={styles.headerRight}>
+            {!user && (
+              <div style={styles.loginIcon} onClick={login}>
+                <img
+                  src="https://developers.google.com/identity/images/g-logo.png"
+                  style={{ width: 20 }}
+                />
+              </div>
+            )}
 
-          {!user && (
-            <div style={styles.loginIcon} onClick={login}>
-              <img
-                src="https://developers.google.com/identity/images/g-logo.png"
-                style={{ width: 20 }}
-              />
+            {user && (
+              <div style={styles.userSection}>
+                {user?.user_metadata?.avatar_url ? (
+                  <img src={user.user_metadata.avatar_url} style={styles.avatar} />
+                ) : (
+                  <div style={styles.fallbackAvatar}>
+                    {user?.email?.charAt(0).toUpperCase()}
+                  </div>
+                )}
+              </div>
+            )}
             </div>
-          )}
-
-          {user && (
-            <div style={styles.userSection}>
-              {user?.user_metadata?.avatar_url ? (
-                <img src={user.user_metadata.avatar_url} style={styles.avatar} />
-              ) : (
-                <div style={styles.fallbackAvatar}>
-                  {user?.email?.charAt(0).toUpperCase()}
-                </div>
-              )}
-              <button style={styles.logoutBtn} onClick={logout}>
-                Logout
-              </button>
-            </div>
-          )}
         </div>
 
         {/* CHAT */}
@@ -287,151 +294,184 @@ const styles = {
     height: "100vh",
     background: "#0f172a"
   },
-  sidebar: {
-    width: "250px",
-    background: "#020617",
-    padding: "10px",
-    color: "white"
-  },
-  chatItem: {
-    padding: "10px",
-    background: "#1f2937",
-    marginBottom: "5px",
-    borderRadius: "6px",
-    cursor: "pointer"
-  },
-  chatContainer: {
-    flex: 1,
-    display: "flex",
-    flexDirection: "column"
-  },
-  header: {
-    padding: "10px",
-    background: "#111827",
-    color: "white"
-  },
-  chatBox: {
-    flex: 1,
-    overflowY: "auto",
-    padding: "20px"
-  },
-  chatBox: {
-    flex: 1,
-    overflowY: "auto",
-    padding: "20px"
-  },
-  input: {
-    flex: 1,
-    padding: "10px"
-  },
-  
-  loginIcon: {
-    width: "30px",
-    height: "30px",
-    borderRadius: "50%",
-    background: "white",
-    display: "flex",
-    justifyContent: "center",
-    alignItems: "center",
-    cursor: "pointer"
-  },
+sidebar: {
+  width: "220px",
+  height: "100vh",
+  background: "#020617",
+  display: "flex",
+  flexDirection: "column",
+  padding: "10px",
+  boxSizing: "border-box"
+},
 
-  userSection: {
-    display: "flex",
-    alignItems: "center",
-    gap: "8px"
-  },
+sidebarBottom: {
+  marginTop: "auto",
+  borderTop: "1px solid #1f2937",
+  paddingTop: "10px"
+},
 
-  avatar: {
-    width: "34px",
-    height: "34px",
-    borderRadius: "50%"
-  },
+chatItem: {
+  width: "100%",            // ✅ FULL WIDTH
+  padding: "10px",
+  marginBottom: "6px",
+  borderRadius: "8px",
+  background: "#1f2937",
+  color: "white",
+  cursor: "pointer",
+  boxSizing: "border-box"
+},
 
-  fallbackAvatar: {
-    width: "30px",
-    height: "30px",
-    borderRadius: "50%",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    fontWeight: "bold",
-    color: "white",
-    background: "linear-gradient(135deg,#6366f1,#8b5cf6)"
-  },
+chatContainer: {
+  flex: 1,
+  display: "flex",
+  flexDirection: "column"
+},
+header: {
+  display: "flex",
+  justifyContent: "space-between", // 🔥 pushes avatar to right
+  alignItems: "center",
+  padding: "16px",
+  background: "#111827",
+  color: "white"
+},
 
-  logoutBtn: {
-    background: "#ef4444",
-    border: "none",
-    color: "white",
-    padding: "6px 10px",
-    borderRadius: "8px",
-    cursor: "pointer",
-    fontSize: "12px"
-  },
+headerRight: {
+  display: "flex",
+  alignItems: "center"
+},
 
-  chatBox: {
-    flex: 1,
-    padding: "20px",
-    overflowY: "auto",
-    display: "flex",
-    flexDirection: "column",
-    gap: "12px"
-  },
+chatBox: {
+  flex: 1,
+  overflowY: "auto",
+  padding: "20px"
+},
+newChatBtn: {
+  width: "100%",            // ✅ FULL WIDTH
+  padding: "10px",
+  background: "#6366f1",
+  color: "white",
+  border: "none",
+  borderRadius: "8px",
+  cursor: "pointer",
+  marginBottom: "10px"
+},
+chatBox: {
+  flex: 1,
+  overflowY: "auto",
+  padding: "20px"
+},
+input: {
+  flex: 1,
+  padding: "10px"
+},
 
-  messageRow: {
-    display: "flex",
-    gap: "8px"
-  },
+loginIcon: {
+  width: "30px",
+  height: "30px",
+  borderRadius: "50%",
+  background: "white",
+  display: "flex",
+  justifyContent: "center",
+  alignItems: "center",
+  cursor: "pointer"
+},
 
-  message: {
-    padding: "10px 14px",
-    borderRadius: "16px",
-    maxWidth: "70%",
-    color: "white"
-  },
+userSection: {
+  display: "flex",
+  alignItems: "center",
+  gap: "8px"
+},
 
-  typing: {
-    display: "flex",
-    gap: "5px"
-  },
+avatar: {
+  width: "30px",
+  height: "30px",
+  borderRadius: "50%"
+},
 
-  quickActions: {
-    display: "flex",
-    flexWrap: "wrap",
-    gap: "8px",
-    marginTop: "10px"
-  },
+fallbackAvatar: {
+  width: "30px",
+  height: "30px",
+  borderRadius: "50%",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  fontWeight: "bold",
+  color: "white",
+  background: "linear-gradient(135deg,#6366f1,#8b5cf6)"
+},
 
-  inputArea: {
-    display: "flex",
-    padding: "10px",
-    borderTop: "1px solid #222"
-  },
+logoutBtn: {
+  width: "100%",            // ✅ FULL WIDTH
+  background: "#ef4444",
+  border: "none",
+  color: "white",
+  padding: "10px",
+  borderRadius: "8px",
+  cursor: "pointer"
+},
 
-  input: {
-    flex: 1,
-    padding: "10px",
-    borderRadius: "10px",
-    border: "none",
-    background: "#1f2937",
-    color: "white"
-  },
+chatBox: {
+  flex: 1,
+  padding: "20px",
+  overflowY: "auto",
+  display: "flex",
+  flexDirection: "column",
+  gap: "12px"
+},
 
-  sendBtn: {
-    marginLeft: "8px",
-    padding: "10px",
-    borderRadius: "10px",
-    border: "none",
-    background: "#6366f1",
-    color: "white",
-    cursor: "pointer"
-  },
+messageRow: {
+  display: "flex",
+  gap: "8px"
+},
 
-  footer: {
-    textAlign: "center",
-    fontSize: "12px",
-    color: "#6b7280",
-    padding: "8px"
-  }
+message: {
+  padding: "10px 14px",
+  borderRadius: "16px",
+  maxWidth: "70%",
+  color: "white"
+},
+
+typing: {
+  display: "flex",
+  gap: "5px"
+},
+
+quickActions: {
+  display: "flex",
+  flexWrap: "wrap",
+  gap: "8px",
+  marginTop: "10px"
+},
+
+inputArea: {
+  display: "flex",
+  padding: "10px",
+  borderTop: "1px solid #222"
+},
+
+input: {
+  flex: 1,
+  padding: "10px",
+  borderRadius: "10px",
+  border: "none",
+  background: "#1f2937",
+  color: "white"
+},
+
+sendBtn: {
+  marginLeft: "8px",
+  padding: "10px",
+  borderRadius: "10px",
+  border: "none",
+  background: "#6366f1",
+  color: "white",
+  cursor: "pointer"
+},
+
+footer: {
+  textAlign: "center",
+  fontSize: "12px",
+  color: "#6b7280",
+  padding: "8px"
+}
 };
