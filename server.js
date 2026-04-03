@@ -1,3 +1,4 @@
+require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
 const fetch = require("node-fetch");
@@ -13,33 +14,47 @@ const supabase = createClient(
   "sb_publishable_S8fprkNjVEng2HSvRsLogQ_Fyl9fuyi"
 )
 
-// ✅ API KEY
-const OPENROUTER_API_KEY = "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";
+const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
 
 // ✅ MEMORY
 let chatHistory = [];
 
 app.post("/chat", async (req, res) => {
-  const { message, user_id } = req.body;
+  const { message, user_id, conversation_id: incomingConvId } = req.body;
 
-  // 🔥 ALWAYS SAVE USER MESSAGE FIRST
+  let conversation_id = incomingConvId;
+
+  // ✅ CREATE CONVERSATION IF NOT EXIST
+  if (!conversation_id && user_id) {
+    const { data } = await supabase
+      .from("conversations")
+      .insert({
+        user_id,
+        title: message.slice(0, 30)
+      })
+      .select()
+      .single();
+
+    conversation_id = data.id;
+  }
+
+  // ✅ SAVE USER MESSAGE
   if (user_id) {
     await supabase.from("chat_history").insert({
       user_id,
       message,
-      sender: "user"
+      sender: "user",
+      conversation_id
     });
   }
 
-
-  // extract tracking number (e.g. NV987654321)
+  // 🔍 TRACKING NUMBER
   const trackingMatch = message.match(/[A-Z]{2}\d{8,}/i);
 
   if (trackingMatch) {
     const trackingNumber = trackingMatch[0].trim().toUpperCase();
-      
 
-    const { data} = await supabase
+    const { data } = await supabase
       .from("orders")
       .select("*")
       .ilike("tracking_number", trackingNumber);
@@ -53,21 +68,21 @@ app.post("/chat", async (req, res) => {
       reply = `📦 ${order.product_name}\nStatus: ${order.status}`;
     }
 
-    // 🔥 SAVE BOT REPLY
+    // ✅ SAVE BOT REPLY
     if (user_id) {
       await supabase.from("chat_history").insert({
         user_id,
         message: reply,
-        sender: "bot"
+        sender: "bot",
+        conversation_id
       });
     }
 
-    return res.json({ reply });
+    return res.json({ reply, conversation_id });
   }
 
-  // 🔥 ORDER TRACKING (FIXED)
+  // 📦 ORDER LIST
   if (message.toLowerCase().includes("track")) {
-
     let reply;
 
     if (!user_id) {
@@ -87,16 +102,16 @@ app.post("/chat", async (req, res) => {
       }
     }
 
-    // 🔥 SAVE BOT REPLY
     if (user_id) {
       await supabase.from("chat_history").insert({
         user_id,
         message: reply,
-        sender: "bot"
+        sender: "bot",
+        conversation_id
       });
     }
 
-    return res.json({ reply });
+    return res.json({ reply, conversation_id });
   }
  
   // 🔥 NORMAL CHAT
@@ -111,9 +126,7 @@ app.post("/chat", async (req, res) => {
       method: "POST",
       headers: {
         "Authorization": `Bearer ${OPENROUTER_API_KEY}`,
-        "Content-Type": "application/json",
-        "HTTP-Referer": "http://localhost:5173",
-        "X-Title": "Customer Support Bot"
+        "Content-Type": "application/json"
       },
       body: JSON.stringify({
         model: "openai/gpt-3.5-turbo",
@@ -150,27 +163,20 @@ Tone:
 
     const data = await response.json();
 
-    let reply;
-
-    if (data.error) {
-      console.error(data.error);
-      reply = "⚠️ AI service error.";
-    } else {
-      reply = data?.choices?.[0]?.message?.content || "⚠️ No response.";
-    }
+    let reply = data?.choices?.[0]?.message?.content || "⚠️ AI error";
 
     chatHistory.push({ role: "assistant", content: reply });
 
-    // 🔥 SAVE BOT REPLY
     if (user_id) {
       await supabase.from("chat_history").insert({
         user_id,
         message: reply,
-        sender: "bot"
+        sender: "bot",
+        conversation_id
       });
     }
 
-    res.json({ reply });
+    res.json({ reply, conversation_id });
 
   } catch (err) {
     console.error(err);

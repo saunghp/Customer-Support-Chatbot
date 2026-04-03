@@ -7,6 +7,9 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const [user, setUser] = useState(null);
 
+  const [conversations, setConversations] = useState([]);
+  const [currentChat, setCurrentChat] = useState(null);
+
   const chatEndRef = useRef(null);
 
   // 🔽 Auto scroll
@@ -14,59 +17,83 @@ export default function App() {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  // ✅ Get user
+  // ✅ AUTH (ONLY ONCE)
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
-      if (data.user) setUser(data.user);
+      setUser(data.user);
     });
 
     const { data: listener } = supabase.auth.onAuthStateChange(
-      (event, session) => {
-        setUser(session?.user || null);
-      }
+      (_, session) => setUser(session?.user || null)
     );
 
     return () => listener.subscription.unsubscribe();
   }, []);
 
-  // ✅ LOAD CHAT HISTORY
-  const loadChatHistory = async () => {
-    if (!user) return;
+  // ✅ Load conversations
+  useEffect(() => {
+    if (user) loadConversations();
+  }, [user]);
+
+  const loadConversations = async () => {
+    const { data } = await supabase
+      .from("conversations")
+      .select("*")
+      .eq("user_id", user.id)
+      .order("created_at", { ascending: false });
+
+    setConversations(data || []);
+  };
+
+  const loadMessages = async (id) => {
+    setCurrentChat(id);
 
     const { data } = await supabase
       .from("chat_history")
       .select("*")
-      .eq("user_id", user.id)
+      .eq("conversation_id", id)
       .order("created_at", { ascending: true });
 
-    if (!data || data.length === 0) {
-      setMessages([
-        {
-          text: "Hi there! 👋 I'm Aria, your virtual support assistant. How can I assist you today?",
-          sender: "bot"
-        }
-      ]);
-      return;
-    }
-
-    const formatted = data.map(msg => ({
-      text: msg.message,
-      sender: msg.sender
+    const formatted = data.map(m => ({
+      text: m.message,
+      sender: m.sender
     }));
 
     setMessages(formatted);
   };
 
-  // 🔥 Run when user changes
+  // ✅ LOAD ALL CHAT HISTORY (fallback)
   useEffect(() => {
-    if (user) loadChatHistory();
+    if (!user) return;
+
+    supabase
+      .from("chat_history")
+      .select("*")
+      .eq("user_id", user.id)
+      .order("created_at", { ascending: true })
+      .then(({ data }) => {
+        if (!data || data.length === 0) {
+          setMessages([
+            {
+              text: "Hi there! 👋 I'm Aria, your virtual support assistant.",
+              sender: "bot"
+            }
+          ]);
+          return;
+        }
+
+        setMessages(
+          data.map(msg => ({
+            text: msg.message,
+            sender: msg.sender
+          }))
+        );
+      });
   }, [user]);
 
   // ✅ LOGIN
   const login = async () => {
-    await supabase.auth.signInWithOAuth({
-      provider: "google"
-    });
+    await supabase.auth.signInWithOAuth({ provider: "google" });
   };
 
   // ✅ LOGOUT
@@ -76,14 +103,17 @@ export default function App() {
     setMessages([]);
   };
 
-  // 🔥 SEND MESSAGE
+  // 🔥 SEND MESSAGE (FIXED)
   const send = async (customText) => {
     const messageToSend = customText || input;
     if (!messageToSend.trim()) return;
 
-    // show user message immediately
-    setMessages(prev => [...prev, { text: messageToSend, sender: "user" }]);
-    setInput("");
+    setMessages(prev => [
+      ...prev,
+      { text: messageToSend, sender: "user" }
+    ]);
+
+    setInput(""); // ✅ FIX
     setLoading(true);
 
     try {
@@ -94,11 +124,17 @@ export default function App() {
         },
         body: JSON.stringify({
           message: messageToSend,
-          user_id: user?.id || null
+          user_id: user?.id,
+          conversation_id: currentChat
         })
       });
 
       const data = await res.json();
+
+      if (data.conversation_id && !currentChat) {
+        setCurrentChat(data.conversation_id);
+        loadConversations(); // refresh sidebar
+      }
 
       setMessages(prev => [
         ...prev,
@@ -117,6 +153,35 @@ export default function App() {
 
   return (
     <div style={styles.page}>
+      
+      {/* SIDEBAR */}
+      <div style={styles.sidebar}>
+        <h3>Chats</h3>
+
+        {conversations.map(c => (
+          <div
+            key={c.id}
+            style={styles.chatItem}
+            onClick={() => loadMessages(c.id)}
+          >
+            {c.title}
+          </div>
+        ))}
+
+        <button onClick={() => {
+          setMessages([
+              {
+      text: "Hi there! 👋 I'm Aria, your virtual support assistant.",
+      sender: "bot"
+    }
+          ]);
+          setCurrentChat(null);
+        }}>
+          + New Chat
+        </button>
+      </div>
+
+      {/* MAIN CHAT */}
       <div style={styles.chatContainer}>
 
         {/* HEADER */}
@@ -127,7 +192,7 @@ export default function App() {
             <div style={styles.loginIcon} onClick={login}>
               <img
                 src="https://developers.google.com/identity/images/g-logo.png"
-                style={{ width: "20px", height: "20px" }}
+                style={{ width: 20 }}
               />
             </div>
           )}
@@ -141,7 +206,6 @@ export default function App() {
                   {user?.email?.charAt(0).toUpperCase()}
                 </div>
               )}
-
               <button style={styles.logoutBtn} onClick={logout}>
                 Logout
               </button>
@@ -156,7 +220,8 @@ export default function App() {
               key={i}
               style={{
                 ...styles.messageRow,
-                justifyContent: m.sender === "user" ? "flex-end" : "flex-start"
+                justifyContent:
+                  m.sender === "user" ? "flex-end" : "flex-start"
               }}
             >
               {m.sender === "bot" && <div>🤖</div>}
@@ -175,7 +240,14 @@ export default function App() {
             </div>
           ))}
 
-          {loading && <div style={styles.typing}>Typing...</div>}
+          {/* typing animation */}
+          {loading && (
+            <div style={styles.typing}>
+              <div className="dot"></div>
+              <div className="dot"></div>
+              <div className="dot"></div>
+            </div>
+          )}
 
           {/* QUICK BUTTONS */}
           <div style={styles.quickActions}>
@@ -197,14 +269,12 @@ export default function App() {
             placeholder="Type a message..."
             onKeyDown={(e) => e.key === "Enter" && send()}
           />
-          <button style={styles.sendBtn} onClick={() => send()}>
+          <button style={styles.sendBtn} onClick={send}>
             ➤
           </button>
         </div>
 
-        <div style={styles.footer}>
-          Powered by AI
-        </div>
+        <div style={styles.footer}>Powered by AI</div>
       </div>
     </div>
   );
@@ -212,34 +282,49 @@ export default function App() {
 
 // 🎨 STYLES
 const styles = {
-  page: {
-    background: "#0f172a",
+ page: {
+    display: "flex",
     height: "100vh",
-    display: "flex",
-    justifyContent: "center",
-    alignItems: "center",
-    fontFamily: "Arial"
+    background: "#0f172a"
   },
-
+  sidebar: {
+    width: "250px",
+    background: "#020617",
+    padding: "10px",
+    color: "white"
+  },
+  chatItem: {
+    padding: "10px",
+    background: "#1f2937",
+    marginBottom: "5px",
+    borderRadius: "6px",
+    cursor: "pointer"
+  },
   chatContainer: {
-    width: "400px",
-    height: "600px",
-    background: "#111827",
-    borderRadius: "20px",
+    flex: 1,
     display: "flex",
-    flexDirection: "column",
-    overflow: "hidden"
+    flexDirection: "column"
   },
-
   header: {
-    padding: "12px 15px",
-    color: "white",
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-    borderBottom: "1px solid #222"
+    padding: "10px",
+    background: "#111827",
+    color: "white"
   },
-
+  chatBox: {
+    flex: 1,
+    overflowY: "auto",
+    padding: "20px"
+  },
+  chatBox: {
+    flex: 1,
+    overflowY: "auto",
+    padding: "20px"
+  },
+  input: {
+    flex: 1,
+    padding: "10px"
+  },
+  
   loginIcon: {
     width: "30px",
     height: "30px",
@@ -264,8 +349,8 @@ const styles = {
   },
 
   fallbackAvatar: {
-    width: "34px",
-    height: "34px",
+    width: "30px",
+    height: "30px",
     borderRadius: "50%",
     display: "flex",
     alignItems: "center",
@@ -287,11 +372,11 @@ const styles = {
 
   chatBox: {
     flex: 1,
-    padding: "15px",
+    padding: "20px",
     overflowY: "auto",
     display: "flex",
     flexDirection: "column",
-    gap: "10px"
+    gap: "12px"
   },
 
   messageRow: {
@@ -307,8 +392,8 @@ const styles = {
   },
 
   typing: {
-    color: "#9ca3af",
-    fontSize: "12px"
+    display: "flex",
+    gap: "5px"
   },
 
   quickActions: {
