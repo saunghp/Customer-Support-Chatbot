@@ -14,7 +14,7 @@ const supabase = createClient(
 )
 
 // ✅ API KEY
-const OPENROUTER_API_KEY = "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";
+const OPENROUTER_API_KEY = "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";
 
 // ✅ MEMORY
 let chatHistory = [];
@@ -116,7 +116,7 @@ app.post("/chat", async (req, res) => {
         "X-Title": "Customer Support Bot"
       },
       body: JSON.stringify({
-        model: "openai/gpt-4o-mini",
+        model: "openai/gpt-3.5-turbo",
         messages: [
           {
             role: "system",
