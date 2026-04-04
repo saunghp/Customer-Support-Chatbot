@@ -17,5 +17,13 @@
   "keywords": [],
   "author": "",
   "license": "ISC",
-  "type": "commonjs"
+  "type": "commonjs",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/saunghp/Customer-Support-Chatbot.git"
+  },
+  "bugs": {
+    "url": "https://github.com/saunghp/Customer-Support-Chatbot/issues"
+  },
+  "homepage": "https://github.com/saunghp/Customer-Support-Chatbot#readme"
 }

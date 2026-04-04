@@ -1,3 +1,4 @@
+import { NativeDelete } from "@/components/delete-button" // ✅ named import
 import { useState, useRef, useEffect } from "react";
 import { supabase } from "./supabase";
 
@@ -18,7 +19,7 @@ export default function App() {
     human: "💬 Human"
   });
 
-  // 🔥 REMEMBER LAST LANGUAGE CONTEXT
+  // 🔥 LANGUAGE CONTEXT
   const [lastUserText, setLastUserText] = useState("");
 
   const chatEndRef = useRef(null);
@@ -73,7 +74,37 @@ export default function App() {
     );
   };
 
-  // ✅ LOAD ALL CHAT HISTORY
+  // 🔥 DELETE CHAT (FIXED POSITION)
+  const deleteChat = async (id) => {
+  try {
+    await supabase
+      .from("chat_history")
+      .delete()
+      .eq("conversation_id", id);
+
+    await supabase
+      .from("conversations")
+      .delete()
+      .eq("id", id);
+
+    setConversations(prev => prev.filter(c => c.id !== id));
+
+    if (currentChat === id) {
+      setMessages([
+        {
+          text: "Hi there! 👋 I'm Aria, your virtual support assistant.",
+          sender: "bot"
+        }
+      ]);
+      setCurrentChat(null);
+    }
+
+  } catch (err) {
+    console.log("Delete failed:", err);
+  }
+};
+
+  // ✅ LOAD CHAT HISTORY
   useEffect(() => {
     if (!user) return;
 
@@ -114,36 +145,29 @@ export default function App() {
     setMessages([]);
   };
 
-  // 🔥 AI LABEL GENERATION
+  // 🔥 AI LABELS
   const generateLabels = async (text) => {
     try {
       const res = await fetch("http://localhost:3000/translate-ui", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ text })
       });
 
       const data = await res.json();
+      if (data.track) setLabels(data);
 
-      if (data.track) {
-        setLabels(data);
-      }
     } catch {
       console.log("Label translation failed");
     }
   };
 
-  // 🔥 SEND MESSAGE (FIXED)
+  // 🔥 SEND MESSAGE
   const send = async (customText) => {
     const messageToSend = customText || input;
     if (!messageToSend.trim()) return;
 
-    // 🔥 STORE CONTEXT FOR BUTTON LANGUAGE
     setLastUserText(messageToSend);
-
-    // 🔥 UPDATE BUTTON LANGUAGE
     generateLabels(messageToSend);
 
     setMessages(prev => [
@@ -157,9 +181,7 @@ export default function App() {
     try {
       const res = await fetch("http://localhost:3000/chat", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           message: messageToSend,
           user_id: user?.id,
@@ -190,6 +212,7 @@ export default function App() {
   };
 
   return (
+    
     <div style={styles.page}>
       {/* SIDEBAR */}
       <div style={styles.sidebar}>
@@ -209,12 +232,31 @@ export default function App() {
 
         <div style={{ marginTop: "10px" }}>
           {conversations.map(c => (
-            <div
-              key={c.id}
-              style={styles.chatItem}
-              onClick={() => loadMessages(c.id)}
-            >
-              {c.title}
+            <div key={c.id} style={styles.chatItem}>
+              
+              <div
+                onClick={() => loadMessages(c.id)}
+                style={{ 
+                  flex: 1,
+                  cursor: "pointer",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  whiteSpace: "nowrap"
+                 }}
+              >
+                {c.title}
+              </div>
+
+              <div style={{ opacity: 0.7 }}>
+                 <NativeDelete
+                    size="sm"
+                    showIcon={true}
+                    buttonText=""
+                    confirmText=""
+                    onConfirm={() => {}}
+                    onDelete={() => deleteChat(c.id)}
+                  />
+              </div>
             </div>
           ))}
         </div>
@@ -228,99 +270,73 @@ export default function App() {
 
       {/* MAIN CHAT */}
       <div style={styles.chatContainer}>
-        {/* HEADER */}
         <div style={styles.header}>
-          <div>Customer Support</div>
+            <div>Customer Support</div>
 
-          <div style={styles.headerRight}>
-            {!user && (
-              <div style={styles.loginIcon} onClick={login}>
-                <img
-                  src="https://developers.google.com/identity/images/g-logo.png"
-                  style={{ width: 20 }}
-                />
-              </div>
-            )}
+            <div style={styles.headerRight}>
+              {!user && (
+                <div style={styles.loginIcon} onClick={login}>
+                  <img
+                    src="https://developers.google.com/identity/images/g-logo.png"
+                    style={{ width: 20 }}
+                  />
+                </div>
+              )}
 
-            {user && (
-              <div style={styles.userSection}>
-                {user?.user_metadata?.avatar_url ? (
-                  <img src={user.user_metadata.avatar_url} style={styles.avatar} />
-                ) : (
-                  <div style={styles.fallbackAvatar}>
-                    {user?.email?.charAt(0).toUpperCase()}
-                  </div>
-                )}
-              </div>
-            )}
+              {user && (
+                <div style={styles.userSection}>
+                  {user?.user_metadata?.avatar_url ? (
+                    <img src={user.user_metadata.avatar_url} style={styles.avatar} />
+                  ) : (
+                    <div style={styles.fallbackAvatar}>
+                      {user?.email?.charAt(0).toUpperCase()}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
-        </div>
 
-        {/* CHAT */}
         <div style={styles.chatBox}>
           {messages.map((m, i) => (
-            <div
-              key={i}
-              style={{
-                ...styles.messageRow,
-                justifyContent: m.sender === "user" ? "flex-end" : "flex-start"
-              }}
-            >
+            <div key={i} style={{
+              ...styles.messageRow,
+              justifyContent: m.sender === "user" ? "flex-end" : "flex-start"
+            }}>
               {m.sender === "bot" && <div>🤖</div>}
 
-              <div
-                style={{
-                  ...styles.message,
-                  background:
-                    m.sender === "user"
-                      ? "linear-gradient(135deg,#6366f1,#8b5cf6)"
-                      : "#1f2937"
-                }}
-              >
+              <div style={{
+                ...styles.message,
+                background: m.sender === "user"
+                  ? "linear-gradient(135deg,#6366f1,#8b5cf6)"
+                  : "#1f2937"
+              }}>
                 {m.text}
               </div>
             </div>
           ))}
 
-          {loading && <div style={styles.typing}>Typing...</div>}
+          {loading && <div>Typing...</div>}
 
-          {/* 🔥 FIXED BUTTONS */}
           <div style={styles.quickActions}>
-            <button onClick={() => send(lastUserText || "Track my order")}>
-              {labels.track}
-            </button>
-
-            <button onClick={() => send(lastUserText || "Refund request")}>
-              {labels.refund}
-            </button>
-
-            <button onClick={() => send(lastUserText || "Account help")}>
-              {labels.account}
-            </button>
-
-            <button onClick={() => send(lastUserText || "Talk to human")}>
-              {labels.human}
-            </button>
+            <button onClick={() => send("Track my order")}>{labels.track}</button>
+            <button onClick={() => send("Refund request")}>{labels.refund}</button>
+            <button onClick={() => send("Account help")}>{labels.account}</button>
+            <button onClick={() => send("Talk to human")}>{labels.human}</button>
           </div>
 
           <div ref={chatEndRef}></div>
         </div>
 
-        {/* INPUT */}
         <div style={styles.inputArea}>
           <input
             style={styles.input}
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            placeholder="Type a message..."
             onKeyDown={(e) => e.key === "Enter" && send()}
           />
-          <button style={styles.sendBtn} onClick={send}>
-            ➤
-          </button>
+          <button onClick={send}>➤</button>
         </div>
-
-        <div style={styles.footer}>Powered by AI</div>
       </div>
     </div>
   );
@@ -350,14 +366,18 @@ sidebarBottom: {
 },
 
 chatItem: {
-  width: "100%",            // ✅ FULL WIDTH
+  width: "100%",
   padding: "10px",
   marginBottom: "6px",
   borderRadius: "8px",
   background: "#1f2937",
   color: "white",
   cursor: "pointer",
-  boxSizing: "border-box"
+  boxSizing: "border-box",
+  display: "flex",
+  justifyContent: "space-between",
+  alignItems: "center",
+  position: "relative"
 },
 
 chatContainer: {
@@ -505,6 +525,14 @@ sendBtn: {
   background: "#6366f1",
   color: "white",
   cursor: "pointer"
+},
+deleteBtn: {
+  background: "transparent",
+  border: "none",
+  color: "#ef4444",
+  cursor: "pointer",
+  fontSize: "14px",
+  marginLeft: "8px"
 },
 
 footer: {
