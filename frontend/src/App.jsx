@@ -10,6 +10,17 @@ export default function App() {
   const [conversations, setConversations] = useState([]);
   const [currentChat, setCurrentChat] = useState(null);
 
+  // 🔥 AI LABELS
+  const [labels, setLabels] = useState({
+    track: "📦 Track",
+    refund: "↩️ Refund",
+    account: "👤 Account",
+    human: "💬 Human"
+  });
+
+  // 🔥 REMEMBER LAST LANGUAGE CONTEXT
+  const [lastUserText, setLastUserText] = useState("");
+
   const chatEndRef = useRef(null);
 
   // 🔽 Auto scroll
@@ -17,7 +28,7 @@ export default function App() {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  // ✅ AUTH (ONLY ONCE)
+  // ✅ AUTH
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
       setUser(data.user);
@@ -54,15 +65,15 @@ export default function App() {
       .eq("conversation_id", id)
       .order("created_at", { ascending: true });
 
-    const formatted = data.map(m => ({
-      text: m.message,
-      sender: m.sender
-    }));
-
-    setMessages(formatted);
+    setMessages(
+      data.map(m => ({
+        text: m.message,
+        sender: m.sender
+      }))
+    );
   };
 
-  // ✅ LOAD ALL CHAT HISTORY (fallback)
+  // ✅ LOAD ALL CHAT HISTORY
   useEffect(() => {
     if (!user) return;
 
@@ -103,17 +114,44 @@ export default function App() {
     setMessages([]);
   };
 
+  // 🔥 AI LABEL GENERATION
+  const generateLabels = async (text) => {
+    try {
+      const res = await fetch("http://localhost:3000/translate-ui", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ text })
+      });
+
+      const data = await res.json();
+
+      if (data.track) {
+        setLabels(data);
+      }
+    } catch {
+      console.log("Label translation failed");
+    }
+  };
+
   // 🔥 SEND MESSAGE (FIXED)
   const send = async (customText) => {
     const messageToSend = customText || input;
     if (!messageToSend.trim()) return;
+
+    // 🔥 STORE CONTEXT FOR BUTTON LANGUAGE
+    setLastUserText(messageToSend);
+
+    // 🔥 UPDATE BUTTON LANGUAGE
+    generateLabels(messageToSend);
 
     setMessages(prev => [
       ...prev,
       { text: messageToSend, sender: "user" }
     ]);
 
-    setInput(""); // ✅ FIX
+    setInput("");
     setLoading(true);
 
     try {
@@ -133,7 +171,7 @@ export default function App() {
 
       if (data.conversation_id && !currentChat) {
         setCurrentChat(data.conversation_id);
-        loadConversations(); // refresh sidebar
+        loadConversations();
       }
 
       setMessages(prev => [
@@ -153,17 +191,16 @@ export default function App() {
 
   return (
     <div style={styles.page}>
-      
       {/* SIDEBAR */}
       <div style={styles.sidebar}>
         <h3>Chats</h3>
 
         <button onClick={() => {
           setMessages([
-              {
-      text: "Hi there! 👋 I'm Aria, your virtual support assistant.",
-      sender: "bot"
-    }
+            {
+              text: "Hi there! 👋 I'm Aria, your virtual support assistant.",
+              sender: "bot"
+            }
           ]);
           setCurrentChat(null);
         }}>
@@ -191,11 +228,10 @@ export default function App() {
 
       {/* MAIN CHAT */}
       <div style={styles.chatContainer}>
-
         {/* HEADER */}
         <div style={styles.header}>
           <div>Customer Support</div>
-          
+
           <div style={styles.headerRight}>
             {!user && (
               <div style={styles.loginIcon} onClick={login}>
@@ -217,7 +253,7 @@ export default function App() {
                 )}
               </div>
             )}
-            </div>
+          </div>
         </div>
 
         {/* CHAT */}
@@ -227,8 +263,7 @@ export default function App() {
               key={i}
               style={{
                 ...styles.messageRow,
-                justifyContent:
-                  m.sender === "user" ? "flex-end" : "flex-start"
+                justifyContent: m.sender === "user" ? "flex-end" : "flex-start"
               }}
             >
               {m.sender === "bot" && <div>🤖</div>}
@@ -246,25 +281,26 @@ export default function App() {
               </div>
             </div>
           ))}
-          
 
-          {/* typing animation */}
-          {loading && (
-            <div style={styles.typing}>
-              <div className="dot"></div>
-              <div className="dot"></div>
-              <div className="dot"></div>
-            </div>
-          )}
-         
-         {loading && <div style={styles.typing}>Typing...</div>}
+          {loading && <div style={styles.typing}>Typing...</div>}
 
-          {/* QUICK BUTTONS */}
+          {/* 🔥 FIXED BUTTONS */}
           <div style={styles.quickActions}>
-            <button onClick={() => send("Track my order")}>📦 Track</button>
-            <button onClick={() => send("Refund request")}>↩️ Refund</button>
-            <button onClick={() => send("Account help")}>👤 Account</button>
-            <button onClick={() => send("Talk to human")}>💬 Human</button>
+            <button onClick={() => send(lastUserText || "Track my order")}>
+              {labels.track}
+            </button>
+
+            <button onClick={() => send(lastUserText || "Refund request")}>
+              {labels.refund}
+            </button>
+
+            <button onClick={() => send(lastUserText || "Account help")}>
+              {labels.account}
+            </button>
+
+            <button onClick={() => send(lastUserText || "Talk to human")}>
+              {labels.human}
+            </button>
           </div>
 
           <div ref={chatEndRef}></div>

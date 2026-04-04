@@ -20,10 +20,10 @@ const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
 let chatHistory = [];
 
 
-// 🌍 AI TRANSLATION FUNCTION (NO BUGS)
-async function translateText(text, targetLang = "English") {
+// 🌍 AI TRANSLATION (ONLY FOR LOGIC)
+async function translateToEnglish(text) {
   try {
-    const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+    const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
       method: "POST",
       headers: {
         "Authorization": `Bearer ${OPENROUTER_API_KEY}`,
@@ -34,7 +34,7 @@ async function translateText(text, targetLang = "English") {
         messages: [
           {
             role: "system",
-            content: `Translate the following text to ${targetLang}. Only return the translation.`
+            content: "Translate this to English. Only return the translation."
           },
           {
             role: "user",
@@ -44,9 +44,8 @@ async function translateText(text, targetLang = "English") {
       })
     });
 
-    const data = await response.json();
+    const data = await res.json();
     return data?.choices?.[0]?.message?.content || text;
-
   } catch {
     return text;
   }
@@ -57,18 +56,27 @@ app.post("/chat", async (req, res) => {
   let { message, user_id, conversation_id: incomingConvId } = req.body;
 
   let conversation_id = incomingConvId;
+  const originalMessage = message;
 
-  // 🌍 STEP 1: DETECT LANGUAGE
-  let detectedLang = "en";
-  if (/[\u1000-\u109F]/.test(message)) {
-    detectedLang = "my"; // Burmese
+  // ✅ PER-USER MEMORY (FIXED 🚀)
+  let userHistory = [];
+
+  if (user_id) {
+    const { data } = await supabase
+      .from("chat_history")
+      .select("*")
+      .eq("user_id", user_id)
+      .order("created_at", { ascending: true });
+
+    userHistory = (data || []).slice(-10).map(m => ({
+      role: m.sender === "user" ? "user" : "assistant",
+      content: m.message
+    }));
   }
 
-  let originalMessage = message;
-
-  // 🌍 STEP 2: TRANSLATE TO ENGLISH
-  let translatedMessage = await translateText(message, "English");
-  message = translatedMessage.toLowerCase();
+  // 🌍 TRANSLATE FOR LOGIC ONLY
+  const translatedMessage = await translateToEnglish(originalMessage);
+  const logicMessage = translatedMessage.toLowerCase();
 
   // ✅ CREATE CONVERSATION
   if (!conversation_id && user_id) {
@@ -84,7 +92,7 @@ app.post("/chat", async (req, res) => {
     conversation_id = data.id;
   }
 
-  //  SAVE USER MESSAGE 
+  // ✅ SAVE USER MESSAGE
   if (user_id) {
     await supabase.from("chat_history").insert({
       user_id,
@@ -94,11 +102,11 @@ app.post("/chat", async (req, res) => {
     });
   }
 
-  //  TRACKING NUMBER
+  // 🔍 TRACKING NUMBER
   const trackingMatch = originalMessage.match(/[A-Z]{2}\d{8,}/i);
 
   if (trackingMatch) {
-    const trackingNumber = trackingMatch[0].trim().toUpperCase();
+    const trackingNumber = trackingMatch[0].toUpperCase();
 
     const { data } = await supabase
       .from("orders")
@@ -111,12 +119,7 @@ app.post("/chat", async (req, res) => {
       reply = `❌ Tracking number ${trackingNumber} not found`;
     } else {
       const order = data[0];
-      reply = `📦 ${order.product_name}\nStatus: ${order.status}`;
-    }
-
-    // 🌍 TRANSLATE BACK
-    if (detectedLang === "my") {
-      reply = await translateText(reply, "Burmese");
+      reply = `📦 ${order.product_name} — ${order.status}`;
     }
 
     if (user_id) {
@@ -131,8 +134,8 @@ app.post("/chat", async (req, res) => {
     return res.json({ reply, conversation_id });
   }
 
-  // 📦 ORDER LIST (WORKS FOR BURMESE NOW)
-  if (message.includes("track")) {
+  // 📦 ORDER LIST
+  if (logicMessage.includes("track")) {
     let reply;
 
     if (!user_id) {
@@ -147,14 +150,9 @@ app.post("/chat", async (req, res) => {
         reply = "📦 You have no orders yet.";
       } else {
         reply =
-          "📦 Your Orders:\n" +
-          orders.map(o => `${o.product_name} — ${o.status}`).join("\n");
+          "📦 " +
+          orders.map(o => `${o.product_name} — ${o.status}`).join(", ");
       }
-    }
-
-    // 🌍 TRANSLATE BACK
-    if (detectedLang === "my") {
-      reply = await translateText(reply, "Burmese");
     }
 
     if (user_id) {
@@ -169,13 +167,7 @@ app.post("/chat", async (req, res) => {
     return res.json({ reply, conversation_id });
   }
 
-  //  NORMAL CHAT
-  chatHistory.push({ role: "user", content: message });
-
-  if (chatHistory.length > 10) {
-    chatHistory = chatHistory.slice(-10);
-  }
-
+  // 🔥 NORMAL CHAT (FIXED MEMORY + LANGUAGE)
   try {
     const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
       method: "POST",
@@ -191,47 +183,29 @@ app.post("/chat", async (req, res) => {
             content: `
 You are a professional customer support assistant.
 
-🌍 LANGUAGE:
-- Always reply in the SAME language as the user
-- If Burmese → use simple, natural Burmese (not formal, not textbook)
-- If English → use natural conversational English
+🌏 LANGUAGE:
+- ALWAYS reply in the SAME language as the user's message
+- Auto-detect language (Chinese, Burmese, Thai, Vietnamese, etc.)
 
 📦 RULES:
-
-1. ORDER TRACKING:
-- If user says "track my order"
-→ ALWAYS fetch their orders using their account
-→ DO NOT ask for order ID
-
-2. ONLY ask for order ID if:
-- user explicitly says something like "track order 12345"
-
-3. PRODUCT QUESTIONS:
-- NEVER ask for order ID
+1. Track order → show orders directly (no order ID needed)
+2. Only ask order ID if user explicitly gives one
+3. Product questions → do NOT ask for order ID
 
 💬 STYLE:
 - Friendly
-- Clear
-- Helpful
-- SHORT (1–2 sentences only)
-- Human-like (like Shopee/Lazada support)
+- Natural
+- SHORT (max 2 sentences)
+- Human-like
 
-❌ AVOID:
-- Long explanations
-- Bullet points
-- Numbered lists
-- Robotic tone
-
-✅ EXAMPLES:
-
-User: Track my order  
-Reply: Your order is on the way 🚚 It should arrive soon.
-
-User (Burmese): ကျွန်တော့် order ကို track လုပ်ချင်ပါတယ်  
-Reply: သင့် order ကို စစ်ပြီးပါပြီ 📦 ပို့နေပါပြီ၊ မကြာခင်ရောက်ပါလိမ့်မယ်။
+❌ DO NOT:
+- Repeat greeting again
+- Give long explanations
+- Use lists or bullet points
 `
           },
-          ...chatHistory
+          ...userHistory,
+          { role: "user", content: originalMessage }
         ]
       })
     });
@@ -239,12 +213,8 @@ Reply: သင့် order ကို စစ်ပြီးပါပြီ 📦 �
     const data = await response.json();
     let reply = data?.choices?.[0]?.message?.content || "⚠️ AI error";
 
-    // 🌍 TRANSLATE BACK
-    if (detectedLang === "my") {
-      reply = await translateText(reply, "Burmese");
-    }
-
-    chatHistory.push({ role: "assistant", content: reply });
+    // ✂️ FORCE SHORT RESPONSE
+    reply = reply.split("\n").slice(0, 2).join(" ");
 
     if (user_id) {
       await supabase.from("chat_history").insert({
