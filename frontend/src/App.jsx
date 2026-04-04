@@ -246,6 +246,7 @@ export default function App() {
               </div>
             </div>
           ))}
+          
 
           {/* typing animation */}
           {loading && (
@@ -255,6 +256,8 @@ export default function App() {
               <div className="dot"></div>
             </div>
           )}
+         
+         {loading && <div style={styles.typing}>Typing...</div>}
 
           {/* QUICK BUTTONS */}
           <div style={styles.quickActions}>
