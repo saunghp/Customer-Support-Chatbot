@@ -218,19 +218,23 @@ export default function App() {
       <div style={styles.sidebar}>
         <h3>Chats</h3>
 
-        <button onClick={() => {
-          setMessages([
-            {
-              text: "Hi there! 👋 I'm Aria, your virtual support assistant.",
-              sender: "bot"
-            }
-          ]);
-          setCurrentChat(null);
-        }}>
-          + New Chat
+        <button
+          style={styles.newChatBtn}
+          onClick={() => {
+            setMessages([
+              {
+                text: "Hi there! 👋 I'm Aria, your virtual support assistant.",
+                sender: "bot"
+              }
+            ]);
+            setCurrentChat(null);
+          }}
+        >
+          <span style={{ fontSize: "18px" }}>＋</span>
+          <span>New Chat</span>
         </button>
 
-        <div style={{ marginTop: "10px" }}>
+        <div style={styles.chatList}>
           {conversations.map(c => (
             <div key={c.id} style={styles.chatItem}>
               
@@ -247,15 +251,15 @@ export default function App() {
                 {c.title}
               </div>
 
-              <div style={{ opacity: 0.7 }}>
-                 <NativeDelete
-                    size="sm"
-                    showIcon={true}
-                    buttonText=""
-                    confirmText=""
-                    onConfirm={() => {}}
-                    onDelete={() => deleteChat(c.id)}
-                  />
+              <div style={{ transform: "scale(0.75)" }}>
+                <NativeDelete
+                  size="sm"
+                  showIcon={true}
+                  buttonText=""
+                  confirmText=""
+                  onConfirm={() => {}}
+                  onDelete={() => deleteChat(c.id)}
+                />
               </div>
             </div>
           ))}
@@ -335,7 +339,12 @@ export default function App() {
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && send()}
           />
-          <button onClick={send}>➤</button>
+          <button
+            style={styles.sendBtn}
+            onClick={send}
+          >
+            ➤
+          </button>
         </div>
       </div>
     </div>
@@ -349,20 +358,42 @@ const styles = {
     height: "100vh",
     background: "#0f172a"
   },
+  chatList: {
+    flex: 1,
+    overflowY: "auto",
+    marginTop: "10px",
+    paddingRight: "4px" // smoother scroll
+  },
+  newChatBtn: {
+  width: "100%",
+  padding: "12px",
+  borderRadius: "12px",
+  border: "1px solid #1f2937",
+  background: "linear-gradient(135deg,#1e293b,#0f172a)",
+  color: "white",
+  fontWeight: "500",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  gap: "8px",
+  cursor: "pointer",
+  transition: "all 0.2s ease"
+},
 sidebar: {
-  width: "220px",
+  width: "230px",
   height: "100vh",
   background: "#020617",
   display: "flex",
   flexDirection: "column",
   padding: "10px",
-  boxSizing: "border-box"
+  boxSizing: "border-box",
+  overflow: "hidden" 
 },
 
 sidebarBottom: {
   marginTop: "auto",
   borderTop: "1px solid #1f2937",
-  paddingTop: "10px"
+  paddingTop: "8px"
 },
 
 chatItem: {
@@ -383,16 +414,20 @@ chatItem: {
 chatContainer: {
   flex: 1,
   display: "flex",
-  flexDirection: "column"
+  flexDirection: "column",
+  height: "100vh",
+  overflow: "hidden" 
 },
 header: {
   display: "flex",
-  justifyContent: "space-between", // 🔥 pushes avatar to right
+  justifyContent: "space-between",
   alignItems: "center",
   padding: "16px",
   background: "#111827",
-  color: "white"
+  color: "white",
+  flexShrink: 0
 },
+
 
 headerRight: {
   display: "flex",
@@ -405,7 +440,7 @@ chatBox: {
   padding: "20px"
 },
 newChatBtn: {
-  width: "100%",            // ✅ FULL WIDTH
+  width: "100%",            
   padding: "10px",
   background: "#6366f1",
   color: "white",
@@ -414,11 +449,7 @@ newChatBtn: {
   cursor: "pointer",
   marginBottom: "10px"
 },
-chatBox: {
-  flex: 1,
-  overflowY: "auto",
-  padding: "20px"
-},
+
 input: {
   flex: 1,
   padding: "10px"
@@ -460,7 +491,7 @@ fallbackAvatar: {
 },
 
 logoutBtn: {
-  width: "100%",            // ✅ FULL WIDTH
+  width: "100%",         
   background: "#ef4444",
   border: "none",
   color: "white",
@@ -505,7 +536,9 @@ quickActions: {
 inputArea: {
   display: "flex",
   padding: "10px",
-  borderTop: "1px solid #222"
+  borderTop: "1px solid #222",
+  background: "#0f172a",
+  flexShrink: 0 
 },
 
 input: {
@@ -537,7 +570,7 @@ deleteBtn: {
 
 footer: {
   textAlign: "center",
-  fontSize: "12px",
+  fontSize: "11px",
   color: "#6b7280",
   padding: "8px"
 }
