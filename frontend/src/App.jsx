@@ -1,6 +1,8 @@
-import { NativeDelete } from "@/components/delete-button" // ✅ named import
+import { NativeDelete } from "@/components/delete-button";
 import { useState, useRef, useEffect } from "react";
 import { supabase } from "./supabase";
+
+const API = "https://backend-jb86.onrender.com";
 
 export default function App() {
   const [messages, setMessages] = useState([]);
@@ -11,7 +13,6 @@ export default function App() {
   const [conversations, setConversations] = useState([]);
   const [currentChat, setCurrentChat] = useState(null);
 
-  // 🔥 AI LABELS
   const [labels, setLabels] = useState({
     track: "📦 Track",
     refund: "↩️ Refund",
@@ -19,7 +20,6 @@ export default function App() {
     human: "💬 Human"
   });
 
-  // 🔥 LANGUAGE CONTEXT
   const [lastUserText, setLastUserText] = useState("");
 
   const chatEndRef = useRef(null);
@@ -48,11 +48,18 @@ export default function App() {
   }, [user]);
 
   const loadConversations = async () => {
-    const { data } = await supabase
+    if (!user) return;
+
+    const { data, error } = await supabase
       .from("conversations")
       .select("*")
       .eq("user_id", user.id)
       .order("created_at", { ascending: false });
+
+    if (error) {
+      console.log(error.message);
+      return;
+    }
 
     setConversations(data || []);
   };
@@ -60,49 +67,46 @@ export default function App() {
   const loadMessages = async (id) => {
     setCurrentChat(id);
 
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from("chat_history")
       .select("*")
       .eq("conversation_id", id)
       .order("created_at", { ascending: true });
 
+    if (error) {
+      console.log(error.message);
+      return;
+    }
+
     setMessages(
-      data.map(m => ({
+      (data || []).map(m => ({
         text: m.message,
         sender: m.sender
       }))
     );
   };
 
-  // 🔥 DELETE CHAT (FIXED POSITION)
+  // 🔥 DELETE CHAT
   const deleteChat = async (id) => {
-  try {
-    await supabase
-      .from("chat_history")
-      .delete()
-      .eq("conversation_id", id);
+    try {
+      await supabase.from("chat_history").delete().eq("conversation_id", id);
+      await supabase.from("conversations").delete().eq("id", id);
 
-    await supabase
-      .from("conversations")
-      .delete()
-      .eq("id", id);
+      setConversations(prev => prev.filter(c => c.id !== id));
 
-    setConversations(prev => prev.filter(c => c.id !== id));
-
-    if (currentChat === id) {
-      setMessages([
-        {
-          text: "Hi there! 👋 I'm Aria, your virtual support assistant.",
-          sender: "bot"
-        }
-      ]);
-      setCurrentChat(null);
+      if (currentChat === id) {
+        setMessages([
+          {
+            text: "Hi there! 👋 I'm Aria, your virtual support assistant.",
+            sender: "bot"
+          }
+        ]);
+        setCurrentChat(null);
+      }
+    } catch (err) {
+      console.log("Delete failed:", err);
     }
-
-  } catch (err) {
-    console.log("Delete failed:", err);
-  }
-};
+  };
 
   // ✅ LOAD CHAT HISTORY
   useEffect(() => {
@@ -145,20 +149,22 @@ export default function App() {
     setMessages([]);
   };
 
-  // 🔥 AI LABELS
+  // 🔥 LABELS
   const generateLabels = async (text) => {
     try {
-      const res = await fetch("http://localhost:3000/translate-ui", {
+      const res = await fetch(`${API}/labels`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ text })
       });
 
+      if (!res.ok) throw new Error();
+
       const data = await res.json();
-      if (data.track) setLabels(data);
+      if (data?.track) setLabels(data);
 
     } catch {
-      console.log("Label translation failed");
+      console.log("Label failed");
     }
   };
 
@@ -179,9 +185,11 @@ export default function App() {
     setLoading(true);
 
     try {
-      const res = await fetch("https://backend-jb86.onrender.com/", {
+      const res = await fetch(`${API}/chat`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json"
+        },
         body: JSON.stringify({
           message: messageToSend,
           user_id: user?.id,
@@ -189,22 +197,24 @@ export default function App() {
         })
       });
 
+      if (!res.ok) throw new Error();
+
       const data = await res.json();
 
-      if (data.conversation_id && !currentChat) {
+      if (data?.conversation_id && !currentChat) {
         setCurrentChat(data.conversation_id);
         loadConversations();
       }
 
       setMessages(prev => [
         ...prev,
-        { text: data.reply, sender: "bot" }
+        { text: data?.reply || "⚠️ Empty response", sender: "bot" }
       ]);
 
     } catch {
       setMessages(prev => [
         ...prev,
-        { text: "⚠️ Server error", sender: "bot" }
+        { text: "⚠️ Backend error (Render sleeping)", sender: "bot" }
       ]);
     }
 
@@ -212,7 +222,6 @@ export default function App() {
   };
 
   return (
-    
     <div style={styles.page}>
       {/* SIDEBAR */}
       <div style={styles.sidebar}>
@@ -230,37 +239,24 @@ export default function App() {
             setCurrentChat(null);
           }}
         >
-          <span style={{ fontSize: "18px" }}>＋</span>
-          <span>New Chat</span>
+          ＋ New Chat
         </button>
 
         <div style={styles.chatList}>
           {conversations.map(c => (
             <div key={c.id} style={styles.chatItem}>
-              
               <div
                 onClick={() => loadMessages(c.id)}
-                style={{ 
-                  flex: 1,
-                  cursor: "pointer",
-                  overflow: "hidden",
-                  textOverflow: "ellipsis",
-                  whiteSpace: "nowrap"
-                 }}
+                style={{ flex: 1, cursor: "pointer" }}
               >
                 {c.title}
               </div>
 
-              <div style={{ transform: "scale(0.75)" }}>
-                <NativeDelete
-                  size="sm"
-                  showIcon={true}
-                  buttonText=""
-                  confirmText=""
-                  onConfirm={() => {}}
-                  onDelete={() => deleteChat(c.id)}
-                />
-              </div>
+              <NativeDelete
+                size="sm"
+                showIcon
+                onDelete={() => deleteChat(c.id)}
+              />
             </div>
           ))}
         </div>
@@ -272,34 +268,15 @@ export default function App() {
         </div>
       </div>
 
-      {/* MAIN CHAT */}
+      {/* CHAT */}
       <div style={styles.chatContainer}>
         <div style={styles.header}>
-            <div>Customer Support</div>
+          Customer Support
 
-            <div style={styles.headerRight}>
-              {!user && (
-                <div style={styles.loginIcon} onClick={login}>
-                  <img
-                    src="https://developers.google.com/identity/images/g-logo.png"
-                    style={{ width: 20 }}
-                  />
-                </div>
-              )}
-
-              {user && (
-                <div style={styles.userSection}>
-                  {user?.user_metadata?.avatar_url ? (
-                    <img src={user.user_metadata.avatar_url} style={styles.avatar} />
-                  ) : (
-                    <div style={styles.fallbackAvatar}>
-                      {user?.email?.charAt(0).toUpperCase()}
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          </div>
+          {!user && (
+            <button onClick={login}>Login</button>
+          )}
+        </div>
 
         <div style={styles.chatBox}>
           {messages.map((m, i) => (
@@ -307,12 +284,10 @@ export default function App() {
               ...styles.messageRow,
               justifyContent: m.sender === "user" ? "flex-end" : "flex-start"
             }}>
-              {m.sender === "bot" && <div>🤖</div>}
-
               <div style={{
                 ...styles.message,
                 background: m.sender === "user"
-                  ? "linear-gradient(135deg,#6366f1,#8b5cf6)"
+                  ? "#6366f1"
                   : "#1f2937"
               }}>
                 {m.text}
@@ -339,12 +314,7 @@ export default function App() {
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && send()}
           />
-          <button
-            style={styles.sendBtn}
-            onClick={send}
-          >
-            ➤
-          </button>
+          <button style={styles.sendBtn} onClick={send}>➤</button>
         </div>
       </div>
     </div>
