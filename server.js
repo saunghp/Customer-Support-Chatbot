@@ -237,5 +237,9 @@ app.get("/", (req, res) => {
   res.send("Server is running 🚀");
 });
 
-// ✅ CHANGED FOR VERCEL — export app instead of listening on a port
-module.exports = app;
+// ✅ FOR RENDER (NOT VERCEL)
+const PORT = process.env.PORT || 3000;
+
+app.listen(PORT, () => {
+  console.log("Server running on port", PORT);
+});
