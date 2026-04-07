@@ -248,11 +248,14 @@ export default function App() {
         { text: data?.reply || "⚠️ Empty response", sender: "bot" }
       ]);
 
-    } catch {
-      setMessages(prev => [
-        ...prev,
-        { text: "⚠️ Server error. Please try again.", sender: "bot" }
-      ]);
+    } catch (err) {
+        console.error("Frontend error:", err);
+
+        setMessages(prev => [
+          ...prev,
+          { text: "⚠️ Server error. Please try again.", sender: "bot" }
+        ]);
+      }
     }
 
     setLoading(false);
