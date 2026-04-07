@@ -237,6 +237,5 @@ app.get("/", (req, res) => {
   res.send("Server is running 🚀");
 });
 
-app.listen(3000, () => {
-  console.log("Server running on http://localhost:3000 🚀");
-});
+// ✅ CHANGED FOR VERCEL — export app instead of listening on a port
+module.exports = app;
