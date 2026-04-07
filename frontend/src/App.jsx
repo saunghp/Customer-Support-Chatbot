@@ -198,68 +198,67 @@ export default function App() {
 
   // 🔥 SEND MESSAGE
   const send = async (customText) => {
-    const messageToSend = customText || input;
-    if (!messageToSend.trim()) return;
+  const messageToSend = customText || input;
+  if (!messageToSend.trim()) return;
 
-    // ✅ Block sending if server not ready
-    if (!serverReady) {
-      setMessages(prev => [...prev, {
-        text: "⏳ Server is still waking up, please wait a moment...",
-        sender: "bot"
-      }]);
-      return;
+  if (!serverReady) {
+    setMessages(prev => [...prev, {
+      text: "⏳ Server is still waking up, please wait a moment...",
+      sender: "bot"
+    }]);
+    return;
+  }
+
+  setLastUserText(messageToSend);
+  generateLabels(messageToSend);
+
+  setMessages(prev => [
+    ...prev,
+    { text: messageToSend, sender: "user" }
+  ]);
+
+  setInput("");
+  setLoading(true);
+
+  try {
+    const res = await fetch(`${API}/chat`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        message: messageToSend,
+        user_id: user?.id,
+        conversation_id: currentChat
+      })
+    });
+
+    if (!res.ok) throw new Error();
+
+    const data = await res.json();
+
+    if (data?.conversation_id && !currentChat) {
+      setCurrentChat(data.conversation_id);
+      loadConversations();
     }
-
-    setLastUserText(messageToSend);
-    generateLabels(messageToSend);
 
     setMessages(prev => [
       ...prev,
-      { text: messageToSend, sender: "user" }
+      { text: data?.reply || "⚠️ Empty response", sender: "bot" }
     ]);
 
-    setInput("");
-    setLoading(true);
+  } catch (err) {
+    console.error("Frontend error:", err);
 
-    try {
-      const res = await fetch(`${API}/chat`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          message: messageToSend,
-          user_id: user?.id,
-          conversation_id: currentChat
-        })
-      });
+    setMessages(prev => [
+      ...prev,
+      { text: "⚠️ Server error. Please try again.", sender: "bot" }
+    ]);
+  }
 
-      if (!res.ok) throw new Error();
-
-      const data = await res.json();
-
-      if (data?.conversation_id && !currentChat) {
-        setCurrentChat(data.conversation_id);
-        loadConversations();
-      }
-
-      setMessages(prev => [
-        ...prev,
-        { text: data?.reply || "⚠️ Empty response", sender: "bot" }
-      ]);
-
-    } catch (err) {
-        console.error("Frontend error:", err);
-
-        setMessages(prev => [
-          ...prev,
-          { text: "⚠️ Server error. Please try again.", sender: "bot" }
-        ]);
-      }
-    }
-
-    setLoading(false);
-  };
+  // ✅ CORRECT POSITION (inside function)
+  setLoading(false);
+};
 
   return (
     <div style={styles.page}>
