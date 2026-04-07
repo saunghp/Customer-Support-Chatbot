@@ -1,0 +1,13 @@
+export default async function handler(req, res) {
+
+  if (req.method !== "POST") {
+    return res.status(405).json({ error: "Method not allowed" });
+  }
+
+  const { message } = req.body;
+
+  // TEMP RESPONSE (replace with AI later)
+  return res.status(200).json({
+    reply: `You said: ${message}`
+  });
+}
