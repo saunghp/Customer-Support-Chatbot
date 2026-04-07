@@ -60,10 +60,17 @@ export default async function handler(req, res) {
       .eq("user_id", user_id)
       .order("created_at", { ascending: true });
 
-    userHistory = (data || []).slice(-10).map(m => ({
-      role: m.sender === "user" ? "user" : "assistant",
-      content: m.message
-    }));
+    userHistory = (data || [])
+      .slice(-5)
+      .filter(m => 
+        m.message && 
+        typeof m.message === "string" &&
+        !m.message.includes("⚠️")
+      )
+      .map(m => ({
+        role: m.sender === "user" ? "user" : "assistant",
+        content: m.message.slice(0, 300)
+      }));
   }
 
   // 🌍 TRANSLATE
@@ -179,14 +186,20 @@ You are a professional customer support assistant.
 - Keep answers SHORT (max 2 sentences)
 `
           },
-          ...userHistory,
+          
           { role: "user", content: originalMessage }
         ]
       })
     });
 
     const data = await response.json();
-    let reply = data?.choices?.[0]?.message?.content || "⚠️ AI error";
+    console.log("OpenRouter FULL response:", JSON.stringify(data, null, 2));
+    
+    let reply = "⚠️ AI error";
+
+    if (data?.choices && data.choices.length > 0) {
+      reply = data.choices[0]?.message?.content || reply;
+    }
 
     reply = reply.split("\n").slice(0, 2).join(" ");
 

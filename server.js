@@ -86,10 +86,17 @@ app.post("/chat", async (req, res) => {
         .eq("user_id", user_id)
         .order("created_at", { ascending: true });
 
-      userHistory = (data || []).slice(-10).map(m => ({
-        role: m.sender === "user" ? "user" : "assistant",
-        content: m.message
-      }));
+      userHistory = (data || [])
+        .slice(-5)
+        .filter(m => 
+          m.message && 
+          typeof m.message === "string" &&
+          !m.message.includes("⚠️")
+        )
+        .map(m => ({
+          role: m.sender === "user" ? "user" : "assistant",
+          content: m.message.slice(0, 300)
+        }));
     }
 
     // 🌍 TRANSLATE
@@ -221,20 +228,25 @@ You are a professional customer support assistant.
 - Use lists or bullet points
 `
           },
-          ...userHistory,
+          
           { role: "user", content: originalMessage }
         ]
       })
     });
 
     const data = await response.json();
+    console.log("OpenRouter FULL response:", JSON.stringify(data, null, 2));
 
     if (!response.ok) {
       console.error("OpenRouter error:", data);
       throw new Error("AI failed");
     }
 
-    let reply = data?.choices?.[0]?.message?.content || "⚠️ AI error";
+    let reply = "⚠️ AI error";
+
+    if (data?.choices && data.choices.length > 0) {
+      reply = data.choices[0]?.message?.content || reply;
+    }
 
     // ✂️ SHORT RESPONSE
     reply = reply.split("\n").slice(0, 2).join(" ");
