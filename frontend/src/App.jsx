@@ -9,6 +9,7 @@ export default function App() {
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [user, setUser] = useState(null);
+  const [serverReady, setServerReady] = useState(false); // ✅ NEW
 
   const [conversations, setConversations] = useState([]);
   const [currentChat, setCurrentChat] = useState(null);
@@ -28,6 +29,33 @@ export default function App() {
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
+
+  // ✅ WAKE UP RENDER ON APP LOAD
+  useEffect(() => {
+    const wakeUp = async () => {
+      try {
+        setMessages([{
+          text: "⏳ Connecting to server, please wait...",
+          sender: "bot"
+        }]);
+
+        await fetch(`${API}/`);
+
+        setServerReady(true);
+        setMessages([{
+          text: "Hi there! 👋 I'm Aria, your virtual support assistant.",
+          sender: "bot"
+        }]);
+      } catch {
+        setMessages([{
+          text: "⚠️ Server is waking up, please try again in 30 seconds.",
+          sender: "bot"
+        }]);
+      }
+    };
+
+    wakeUp();
+  }, []);
 
   // ✅ AUTH
   useEffect(() => {
@@ -173,6 +201,15 @@ export default function App() {
     const messageToSend = customText || input;
     if (!messageToSend.trim()) return;
 
+    // ✅ Block sending if server not ready
+    if (!serverReady) {
+      setMessages(prev => [...prev, {
+        text: "⏳ Server is still waking up, please wait a moment...",
+        sender: "bot"
+      }]);
+      return;
+    }
+
     setLastUserText(messageToSend);
     generateLabels(messageToSend);
 
@@ -214,7 +251,7 @@ export default function App() {
     } catch {
       setMessages(prev => [
         ...prev,
-        { text: "⚠️ Backend error (Render sleeping)", sender: "bot" }
+        { text: "⚠️ Server error. Please try again.", sender: "bot" }
       ]);
     }
 
@@ -332,7 +369,7 @@ const styles = {
     flex: 1,
     overflowY: "auto",
     marginTop: "10px",
-    paddingRight: "4px" // smoother scroll
+    paddingRight: "4px"
   },
   newChatBtn: {
   width: "100%",
@@ -357,7 +394,7 @@ sidebar: {
   flexDirection: "column",
   padding: "10px",
   boxSizing: "border-box",
-  overflow: "hidden" 
+  overflow: "hidden"
 },
 
 sidebarBottom: {
@@ -386,7 +423,7 @@ chatContainer: {
   display: "flex",
   flexDirection: "column",
   height: "100vh",
-  overflow: "hidden" 
+  overflow: "hidden"
 },
 header: {
   display: "flex",
@@ -398,7 +435,6 @@ header: {
   flexShrink: 0
 },
 
-
 headerRight: {
   display: "flex",
   alignItems: "center"
@@ -408,16 +444,6 @@ chatBox: {
   flex: 1,
   overflowY: "auto",
   padding: "20px"
-},
-newChatBtn: {
-  width: "100%",            
-  padding: "10px",
-  background: "#6366f1",
-  color: "white",
-  border: "none",
-  borderRadius: "8px",
-  cursor: "pointer",
-  marginBottom: "10px"
 },
 
 input: {
@@ -461,7 +487,7 @@ fallbackAvatar: {
 },
 
 logoutBtn: {
-  width: "100%",         
+  width: "100%",
   background: "#ef4444",
   border: "none",
   color: "white",
@@ -508,7 +534,7 @@ inputArea: {
   padding: "10px",
   borderTop: "1px solid #222",
   background: "#0f172a",
-  flexShrink: 0 
+  flexShrink: 0
 },
 
 input: {
