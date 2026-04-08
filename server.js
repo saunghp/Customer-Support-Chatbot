@@ -8,17 +8,17 @@ const app = express();
 app.use(cors({ origin: "*" }));
 app.use(express.json());
 
-// ✅ DEBUG ENV
+//  DEBUG ENV
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
 console.log("API KEY:", OPENROUTER_API_KEY ? "Loaded ✅" : "Missing ❌");
 
-// ✅ Supabase
+//  Supabase
 const supabase = createClient(
   "https://zzsawacervuerwraeifk.supabase.co",
   "sb_publishable_S8fprkNjVEng2HSvRsLogQ_Fyl9fuyi"
 );
 
-// 🌍 TRANSLATION
+//  TRANSLATION
 async function translateToEnglish(text) {
   try {
     const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
@@ -53,7 +53,7 @@ async function translateToEnglish(text) {
   }
 }
 
-// ✅ LABELS (FIXED)
+//  LABELS 
 app.post("/labels", async (req, res) => {
   try {
     res.json({
@@ -68,7 +68,7 @@ app.post("/labels", async (req, res) => {
   }
 });
 
-// ✅ CHAT
+// CHAT
 app.post("/chat", async (req, res) => {
   try {
     let { message, user_id, conversation_id: incomingConvId } = req.body;
@@ -76,7 +76,7 @@ app.post("/chat", async (req, res) => {
     let conversation_id = incomingConvId;
     const originalMessage = message;
 
-    // 🧠 USER MEMORY
+    //  USER MEMORY
     let userHistory = [];
 
     if (user_id) {
@@ -86,24 +86,26 @@ app.post("/chat", async (req, res) => {
         .eq("user_id", user_id)
         .order("created_at", { ascending: true });
 
-      userHistory = (data || [])
-        .slice(-5)
-        .filter(m => 
-          m.message && 
-          typeof m.message === "string" &&
-          !m.message.includes("⚠️")
-        )
-        .map(m => ({
-          role: m.sender === "user" ? "user" : "assistant",
-          content: m.message.slice(0, 300)
-        }));
+      if (!error && data) {
+        userHistory = data
+          .slice(-5)
+          .filter(m =>
+            m.message &&
+            typeof m.message === "string" &&
+            !m.message.includes("⚠️")
+          )
+          .map(m => ({
+            role: m.sender === "user" ? "user" : "assistant",
+            content: m.message.slice(0, 300)
+          }));
+      }
     }
 
-    // 🌍 TRANSLATE
+    //  TRANSLATE
     const translatedMessage = await translateToEnglish(originalMessage);
     const logicMessage = translatedMessage.toLowerCase();
 
-    // 🆕 CREATE CONVERSATION
+    //  CREATE CONVERSATION
     if (!conversation_id && user_id) {
       const { data } = await supabase
         .from("conversations")
@@ -114,11 +116,16 @@ app.post("/chat", async (req, res) => {
         .select()
         .single();
 
-      conversation_id = data?.id;
+      if (error || !data) {
+        console.error("Conversation creation failed:", error);
+        conversation_id = null;
+      } else {
+        conversation_id = data.id;
+      }
     }
 
     // 💾 SAVE USER MESSAGE
-    if (user_id) {
+    if (user_id && conversation_id) {
       await supabase.from("chat_history").insert({
         user_id,
         message: originalMessage,
@@ -147,7 +154,7 @@ app.post("/chat", async (req, res) => {
         reply = `📦 ${order.product_name} — ${order.status}`;
       }
 
-      if (user_id) {
+      if (user_id && conversation_id) {
         await supabase.from("chat_history").insert({
           user_id,
           message: reply,
@@ -180,7 +187,7 @@ app.post("/chat", async (req, res) => {
         }
       }
 
-      if (user_id) {
+      if (user_id && conversation_id) {
         await supabase.from("chat_history").insert({
           user_id,
           message: reply,
@@ -192,7 +199,7 @@ app.post("/chat", async (req, res) => {
       return res.json({ reply, conversation_id });
     }
 
-    // 🤖 AI RESPONSE
+    //  AI RESPONSE
     const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -251,10 +258,10 @@ You are a professional customer support assistant.
       reply = data.choices[0]?.message?.content || reply;
     }
 
-    // ✂️ SHORT RESPONSE
+    //  SHORT RESPONSE
     reply = reply.split("\n").slice(0, 2).join(" ");
 
-    if (user_id) {
+    if (user_id && conversation_id) {
       await supabase.from("chat_history").insert({
         user_id,
         message: reply,
@@ -271,7 +278,7 @@ You are a professional customer support assistant.
   }
 });
 
-// ✅ ROOT
+//  ROOT
 app.get("/", (req, res) => {
   res.send("Server is running 🚀");
 });
