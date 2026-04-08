@@ -294,7 +294,7 @@ export default function App() {
         <h3 style={{ color: "white", margin: "0 0 10px 0" }}>Chats</h3>
 
         <button
-          style={styles.newChatBtn}
+          style={{ width:"100%", padding:"12px", borderRadius:"12px", border:"1px solid #1f2937", background:"#1e293b", color:"white", fontWeight:"500", fontSize:"15px", display:"flex", alignItems:"center", justifyContent:"center", gap:"8px", cursor:"pointer" }}
           onClick={() => {
             setMessages([
               {
@@ -474,19 +474,12 @@ const styles = {
   },
   logoutBtn: {
     width: "100%",
-    padding: "12px",
-    borderRadius: "12px",
-    border: "1px solid #ef4444",
-    background: "linear-gradient(135deg,#1e293b,#0f172a)",
+    background: "#ef4444",
+    border: "none",
     color: "white",
-    fontWeight: "500",
-    fontSize: "15px",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: "8px",
-    cursor: "pointer",
-    transition: "all 0.2s ease"
+    padding: "10px",
+    borderRadius: "8px",
+    cursor: "pointer"
   },
   loginBtn: {
     width: "100%",

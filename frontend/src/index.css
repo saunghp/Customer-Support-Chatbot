@@ -7,6 +7,7 @@
 @custom-variant dark (&:is(.dark *));
 @tailwind components;
 @tailwind utilities;
+
 :root {
   --text: #6b6375;
   --text-h: #08060d;
@@ -39,64 +40,35 @@
   }
 
   --background: oklch(1 0 0);
-
   --foreground: oklch(0.145 0 0);
-
   --card: oklch(1 0 0);
-
   --card-foreground: oklch(0.145 0 0);
-
   --popover: oklch(1 0 0);
-
   --popover-foreground: oklch(0.145 0 0);
-
   --primary: oklch(0.205 0 0);
-
   --primary-foreground: oklch(0.985 0 0);
-
   --secondary: oklch(0.97 0 0);
-
   --secondary-foreground: oklch(0.205 0 0);
-
   --muted: oklch(0.97 0 0);
-
   --muted-foreground: oklch(0.556 0 0);
-
   --accent-foreground: oklch(0.205 0 0);
-
   --destructive: oklch(0.577 0.245 27.325);
-
   --input: oklch(0.922 0 0);
-
   --ring: oklch(0.708 0 0);
-
   --chart-1: oklch(0.87 0 0);
-
   --chart-2: oklch(0.556 0 0);
-
   --chart-3: oklch(0.439 0 0);
-
   --chart-4: oklch(0.371 0 0);
-
   --chart-5: oklch(0.269 0 0);
-
   --radius: 0.625rem;
-
   --sidebar: oklch(0.985 0 0);
-
   --sidebar-foreground: oklch(0.145 0 0);
-
   --sidebar-primary: oklch(0.205 0 0);
-
   --sidebar-primary-foreground: oklch(0.985 0 0);
-
   --sidebar-accent: oklch(0.97 0 0);
-
   --sidebar-accent-foreground: oklch(0.205 0 0);
-
   --sidebar-border: oklch(0.922 0 0);
-
-  --sidebar-ring: oklch(0.708 0 0)
+  --sidebar-ring: oklch(0.708 0 0);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -123,20 +95,20 @@ body {
   margin: 0;
 }
 
+/* ✅ FIX: Override #root so chat layout fills full screen */
 #root {
-  width: 1126px;
-  max-width: 100%;
-  margin: 0 auto;
-  text-align: center;
-  border-inline: 1px solid var(--border);
+  width: 100% !important;
+  max-width: 100% !important;
+  margin: 0 !important;
+  text-align: left !important;
+  border: none !important;
   min-height: 100svh;
   display: flex;
   flex-direction: column;
   box-sizing: border-box;
 }
 
-h1,
-h2 {
+h1, h2 {
   font-family: var(--heading);
   font-weight: 500;
   color: var(--text-h);
@@ -151,6 +123,7 @@ h1 {
     margin: 20px 0;
   }
 }
+
 h2 {
   font-size: 24px;
   line-height: 118%;
@@ -160,12 +133,12 @@ h2 {
     font-size: 20px;
   }
 }
+
 p {
   margin: 0;
 }
 
-code,
-.counter {
+code, .counter {
   font-family: var(--mono);
   display: inline-flex;
   border-radius: 4px;
@@ -208,7 +181,7 @@ code {
   --color-primary-foreground: var(--primary-foreground);
   --color-primary: var(--primary);
   --color-popover-foreground: var(--popover-foreground);
-  --color-popover: var(--popover);
+  --color-popover: var(--card);
   --color-card-foreground: var(--card-foreground);
   --color-card: var(--card);
   --color-foreground: var(--foreground);
@@ -258,8 +231,24 @@ code {
 
 @layer base {
   * {
-    @apply border-border outline-ring/50;}
+    @apply border-border outline-ring/50;
+  }
   body {
-    @apply bg-background text-foreground;}
+    @apply bg-background text-foreground;
+  }
   html {
-    @apply font-sans;}}
+    @apply font-sans;
+  }
+}
+
+/* ✅ FIX: Reset button styles so inline styles in App.jsx are respected */
+button {
+  background: revert !important;
+  border: revert !important;
+  color: revert !important;
+  padding: revert !important;
+  border-radius: revert !important;
+  font-weight: revert !important;
+  font-size: revert !important;
+  cursor: pointer !important;
+}

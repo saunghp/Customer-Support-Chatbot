@@ -8,4 +8,7 @@ export default {
     extend: {},
   },
   plugins: [],
+  corePlugins: {
+    preflight: false, // ✅ disables Tailwind base reset that overrides button styles
+  },
 }
