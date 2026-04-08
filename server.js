@@ -8,17 +8,17 @@ const app = express();
 app.use(cors({ origin: "*" }));
 app.use(express.json());
 
-//  DEBUG ENV
+// DEBUG ENV
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
 console.log("API KEY:", OPENROUTER_API_KEY ? "Loaded ✅" : "Missing ❌");
 
-//  Supabase
+// Supabase
 const supabase = createClient(
   "https://zzsawacervuerwraeifk.supabase.co",
   "sb_publishable_S8fprkNjVEng2HSvRsLogQ_Fyl9fuyi"
 );
 
-//  TRANSLATION
+// TRANSLATION
 async function translateToEnglish(text) {
   try {
     const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
@@ -53,7 +53,7 @@ async function translateToEnglish(text) {
   }
 }
 
-//  LABELS 
+// LABELS
 app.post("/labels", async (req, res) => {
   try {
     res.json({
@@ -76,11 +76,12 @@ app.post("/chat", async (req, res) => {
     let conversation_id = incomingConvId;
     const originalMessage = message;
 
-    //  USER MEMORY
+    // USER MEMORY
     let userHistory = [];
 
     if (user_id) {
-      const { data } = await supabase
+      // ✅ FIX 1: destructure `error` properly
+      const { data, error } = await supabase
         .from("chat_history")
         .select("*")
         .eq("user_id", user_id)
@@ -101,13 +102,14 @@ app.post("/chat", async (req, res) => {
       }
     }
 
-    //  TRANSLATE
+    // TRANSLATE
     const translatedMessage = await translateToEnglish(originalMessage);
     const logicMessage = translatedMessage.toLowerCase();
 
-    //  CREATE CONVERSATION
+    // CREATE CONVERSATION
     if (!conversation_id && user_id) {
-      const { data } = await supabase
+      // ✅ FIX 2: destructure `error` properly
+      const { data, error } = await supabase
         .from("conversations")
         .insert({
           user_id,
@@ -124,7 +126,7 @@ app.post("/chat", async (req, res) => {
       }
     }
 
-    // 💾 SAVE USER MESSAGE
+    // SAVE USER MESSAGE
     if (user_id && conversation_id) {
       await supabase.from("chat_history").insert({
         user_id,
@@ -134,20 +136,21 @@ app.post("/chat", async (req, res) => {
       });
     }
 
-    // 🔍 TRACKING NUMBER
+    // TRACKING NUMBER
     const trackingMatch = originalMessage.match(/[A-Z]{2}\d{8,}/i);
 
     if (trackingMatch) {
       const trackingNumber = trackingMatch[0].toUpperCase();
 
-      const { data } = await supabase
+      // ✅ FIX 3: destructure `error` properly
+      const { data, error } = await supabase
         .from("orders")
         .select("*")
         .ilike("tracking_number", trackingNumber);
 
       let reply;
 
-      if (!data || data.length === 0) {
+      if (error || !data || data.length === 0) {
         reply = `❌ Tracking number ${trackingNumber} not found`;
       } else {
         const order = data[0];
@@ -166,19 +169,20 @@ app.post("/chat", async (req, res) => {
       return res.json({ reply, conversation_id });
     }
 
-    // 📦 ORDER LIST
+    // ORDER LIST
     if (logicMessage.includes("track")) {
       let reply;
 
       if (!user_id) {
         reply = "⚠️ Please login first";
       } else {
-        const { data: orders } = await supabase
+        // ✅ FIX 4: destructure `error` properly
+        const { data: orders, error: ordersError } = await supabase
           .from("orders")
           .select("*")
           .eq("user_id", user_id);
 
-        if (!orders || orders.length === 0) {
+        if (ordersError || !orders || orders.length === 0) {
           reply = "📦 You have no orders yet.";
         } else {
           reply =
@@ -199,7 +203,7 @@ app.post("/chat", async (req, res) => {
       return res.json({ reply, conversation_id });
     }
 
-    //  AI RESPONSE
+    // AI RESPONSE
     const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -258,7 +262,7 @@ You are a professional customer support assistant.
       reply = data.choices[0]?.message?.content || reply;
     }
 
-    //  SHORT RESPONSE
+    // SHORT RESPONSE
     reply = reply.split("\n").slice(0, 2).join(" ");
 
     if (user_id && conversation_id) {
@@ -278,12 +282,12 @@ You are a professional customer support assistant.
   }
 });
 
-//  ROOT
+// ROOT
 app.get("/", (req, res) => {
   res.send("Server is running 🚀");
 });
 
-// 🚀 START
+// START
 const PORT = process.env.PORT || 3000;
 
 app.listen(PORT, () => {
