@@ -228,7 +228,7 @@ You are a professional customer support assistant.
 - Use lists or bullet points
 `
           },
-          
+          ...userHistory,
           { role: "user", content: originalMessage }
         ]
       })
@@ -239,7 +239,10 @@ You are a professional customer support assistant.
 
     if (!response.ok) {
       console.error("OpenRouter error:", data);
-      throw new Error("AI failed");
+
+      return res.json({
+        reply: "⚠️ AI is temporarily unavailable. Please try again."
+      });
     }
 
     let reply = "⚠️ AI error";
