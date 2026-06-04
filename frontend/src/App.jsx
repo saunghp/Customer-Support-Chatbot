@@ -61,6 +61,7 @@ export default function App() {
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [user, setUser] = useState(null);
+  const [avatarFailed, setAvatarFailed] = useState(false);
   const [serverReady, setServerReady] = useState(false);
 
   const [conversations, setConversations] = useState([]);
@@ -116,7 +117,10 @@ export default function App() {
     });
 
     const { data: listener } = supabase.auth.onAuthStateChange(
-      (_, session) => setUser(session?.user || null)
+      (_, session) => {
+        setUser(session?.user || null);
+        setAvatarFailed(false);
+      }
     );
 
     return () => listener.subscription.unsubscribe();
@@ -410,8 +414,14 @@ export default function App() {
 
           {user ? (
             <div style={styles.userSection}>
-              {user.user_metadata?.avatar_url ? (
-                <img src={user.user_metadata.avatar_url} style={styles.avatar} alt="avatar" />
+              {user.user_metadata?.avatar_url && !avatarFailed ? (
+                <img
+                  src={user.user_metadata.avatar_url}
+                  style={styles.avatar}
+                  alt="avatar"
+                  onError={() => setAvatarFailed(true)}
+                  referrerPolicy="no-referrer"
+                />
               ) : (
                 <div style={styles.fallbackAvatar}>
                   {user.email?.[0]?.toUpperCase() || "U"}
@@ -621,7 +631,11 @@ const styles = {
   avatar: {
     width: "30px",
     height: "30px",
-    borderRadius: "50%"
+    borderRadius: "50%",
+    objectFit: "cover",
+    display: "block",
+    flexShrink: 0,
+    background: "linear-gradient(135deg,#6366f1,#8b5cf6)"
   },
   fallbackAvatar: {
     width: "30px",
