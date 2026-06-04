@@ -227,7 +227,7 @@ app.post("/chat", async (req, res) => {
     const logicMessage = translatedMessage.toLowerCase();
 
     // CREATE CONVERSATION
-    if (!convoId) {
+    if (!convoId && safeUserId) {
       // ✅ FIX 2: destructure `error` properly
       const { data, error } = await db
         .from("conversations")
@@ -251,7 +251,7 @@ app.post("/chat", async (req, res) => {
     }
 
     // SAVE USER MESSAGE
-    if (convoId) {
+    if (convoId && safeUserId) {
       const { error } = await db.from("chat_history").insert([
         {
           user_id: safeUserId,
@@ -287,7 +287,7 @@ app.post("/chat", async (req, res) => {
         reply = `📦 ${order.product_name} — ${order.status}`;
       }
 
-      if (convoId) {
+      if (convoId && safeUserId) {
         const { error } = await db.from("chat_history").insert({
           user_id: safeUserId,
           message: reply,
@@ -325,7 +325,7 @@ app.post("/chat", async (req, res) => {
         }
       }
 
-      if (convoId) {
+      if (convoId && safeUserId) {
         const { error } = await db.from("chat_history").insert({
           user_id: safeUserId,
           message: reply,
@@ -394,7 +394,7 @@ You are a professional customer support assistant.
     // SHORT RESPONSE
     reply = reply.split("\n").slice(0, 2).join(" ");
 
-    if (convoId) {
+    if (convoId && safeUserId) {
       const { error } = await db.from("chat_history").insert({
         user_id: safeUserId,
         message: reply,
