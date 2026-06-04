@@ -214,9 +214,11 @@ export default function App() {
         body: JSON.stringify({ text })
       });
 
-      if (!res.ok) throw new Error();
-
       const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data?.reply || data?.error || `Request failed (${res.status})`);
+      }
       if (data?.track) setLabels(data);
 
     } catch {
@@ -265,9 +267,11 @@ export default function App() {
         })
       });
 
-      if (!res.ok) throw new Error();
-
       const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data?.reply || data?.error || `Request failed (${res.status})`);
+      }
 
       if (data?.conversation_id && !currentChat) {
         setCurrentChat(data.conversation_id);

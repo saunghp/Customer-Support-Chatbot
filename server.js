@@ -40,6 +40,29 @@ function getSupabaseForRequest(req) {
   );
 }
 
+function getBearerToken(req) {
+  const authHeader = req.headers.authorization || "";
+  const match = authHeader.match(/^Bearer\s+(.+)$/i);
+
+  return match?.[1] || null;
+}
+
+async function getAuthenticatedUser(req) {
+  const token = getBearerToken(req);
+
+  if (!token) {
+    return { user: null, error: null };
+  }
+
+  const { data, error } = await supabase.auth.getUser(token);
+
+  if (error || !data?.user) {
+    return { user: null, error };
+  }
+
+  return { user: data.user, error: null };
+}
+
 async function readJsonSafely(res) {
   const text = await res.text();
 
@@ -146,9 +169,27 @@ app.post("/chat", async (req, res) => {
   try {
     const db = getSupabaseForRequest(req);
     let { message, user_id, conversation_id: incomingConvId } = req.body;
+    const { user: authUser, error: authError } = await getAuthenticatedUser(req);
 
     if (!message || typeof message !== "string") {
       return res.status(400).json({ reply: "Please type a message first." });
+    }
+
+    if (authError) {
+      console.error("Auth token validation failed:", authError);
+      return res.status(401).json({
+        reply: "Login session is invalid. Please log out, sign in again, and retry."
+      });
+    }
+
+    if (user_id && !authUser) {
+      return res.status(401).json({
+        reply: "Login session token is missing. Please redeploy the frontend so it sends the Supabase access token."
+      });
+    }
+
+    if (authUser) {
+      user_id = authUser.id;
     }
 
     let conversation_id = incomingConvId;
@@ -198,7 +239,9 @@ app.post("/chat", async (req, res) => {
 
       if (error || !data) {
         console.error("Conversation creation failed:", error);
-        conversation_id = null;
+        return res.status(500).json({
+          reply: `Could not create conversation: ${error?.message || "Unknown Supabase error"}`
+        });
       } else {
         conversation_id = data.id;
       }
@@ -215,6 +258,9 @@ app.post("/chat", async (req, res) => {
 
       if (error) {
         console.error("Saving user message failed:", error);
+        return res.status(500).json({
+          reply: `Could not save your message: ${error.message}`
+        });
       }
     }
 
