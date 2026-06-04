@@ -7,6 +7,33 @@ const API = import.meta.env.DEV
 
 // ✅ FIX: Simple inline delete button — removes broken NativeDelete import
 function DeleteButton({ onDelete }) {
+  const [confirming, setConfirming] = useState(false);
+
+  if (confirming) {
+    return (
+      <div style={styles.deleteConfirm} onClick={(e) => e.stopPropagation()}>
+        <span style={styles.deleteConfirmText}>Delete?</span>
+        <button
+          style={styles.deleteConfirmBtn}
+          onClick={() => {
+            setConfirming(false);
+            onDelete();
+          }}
+          title="Confirm delete"
+        >
+          Yes
+        </button>
+        <button
+          style={styles.deleteCancelBtn}
+          onClick={() => setConfirming(false)}
+          title="Cancel delete"
+        >
+          No
+        </button>
+      </div>
+    );
+  }
+
   return (
     <button
       style={{
@@ -20,7 +47,7 @@ function DeleteButton({ onDelete }) {
       }}
       onClick={(e) => {
         e.stopPropagation();
-        onDelete();
+        setConfirming(true);
       }}
       title="Delete chat"
     >
@@ -515,6 +542,36 @@ const styles = {
     fontSize: "14px",
     boxShadow: "0 4px 12px rgba(0,0,0,0.35)",
     transition: "all 0.2s ease",
+  },
+  deleteConfirm: {
+    display: "flex",
+    alignItems: "center",
+    gap: "6px",
+    marginLeft: "8px",
+    flexShrink: 0
+  },
+  deleteConfirmText: {
+    color: "#fecaca",
+    fontSize: "12px",
+    fontWeight: "600"
+  },
+  deleteConfirmBtn: {
+    background: "#ef4444",
+    color: "white",
+    border: "none",
+    borderRadius: "6px",
+    padding: "4px 7px",
+    fontSize: "12px",
+    cursor: "pointer"
+  },
+  deleteCancelBtn: {
+    background: "#374151",
+    color: "white",
+    border: "none",
+    borderRadius: "6px",
+    padding: "4px 7px",
+    fontSize: "12px",
+    cursor: "pointer"
   },
   sidebarBottom: {
     marginTop: "auto",
