@@ -122,6 +122,7 @@ export default function App() {
       .from("chat_history")
       .select("*")
       .eq("conversation_id", id)
+      .eq("user_id", user.id)
       .order("created_at", { ascending: true });
 
     if (error) {
@@ -140,8 +141,27 @@ export default function App() {
   // DELETE CHAT
   const deleteChat = async (id) => {
     try {
-      await supabase.from("chat_history").delete().eq("conversation_id", id);
-      await supabase.from("conversations").delete().eq("id", id);
+      if (!user) return;
+
+      const { error: historyError } = await supabase
+        .from("chat_history")
+        .delete()
+        .eq("conversation_id", id)
+        .eq("user_id", user.id);
+
+      if (historyError) {
+        throw historyError;
+      }
+
+      const { error: conversationError } = await supabase
+        .from("conversations")
+        .delete()
+        .eq("id", id)
+        .eq("user_id", user.id);
+
+      if (conversationError) {
+        throw conversationError;
+      }
 
       setConversations(prev => prev.filter(c => c.id !== id));
 
@@ -156,6 +176,10 @@ export default function App() {
       }
     } catch (err) {
       console.log("Delete failed:", err);
+      setMessages(prev => [
+        ...prev,
+        { text: `Could not delete chat: ${err.message}`, sender: "bot" }
+      ]);
     }
   };
 

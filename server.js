@@ -226,14 +226,16 @@ app.post("/chat", async (req, res) => {
     const logicMessage = translatedMessage.toLowerCase();
 
     // CREATE CONVERSATION
-    if (!conversation_id && user_id) {
+    if (!conversation_id) {
       // ✅ FIX 2: destructure `error` properly
       const { data, error } = await db
         .from("conversations")
-        .insert({
-          user_id,
-          title: originalMessage.slice(0, 30)
-        })
+        .insert([
+          {
+            user_id: user_id || null,
+            title: originalMessage.slice(0, 30)
+          }
+        ])
         .select()
         .single();
 
@@ -248,9 +250,9 @@ app.post("/chat", async (req, res) => {
     }
 
     // SAVE USER MESSAGE
-    if (user_id && conversation_id) {
+    if (conversation_id) {
       const { error } = await db.from("chat_history").insert({
-        user_id,
+        user_id: user_id || null,
         message: originalMessage,
         sender: "user",
         conversation_id
@@ -285,9 +287,9 @@ app.post("/chat", async (req, res) => {
         reply = `📦 ${order.product_name} — ${order.status}`;
       }
 
-      if (user_id && conversation_id) {
+      if (conversation_id) {
         const { error } = await db.from("chat_history").insert({
-          user_id,
+          user_id: user_id || null,
           message: reply,
           sender: "bot",
           conversation_id
@@ -323,9 +325,9 @@ app.post("/chat", async (req, res) => {
         }
       }
 
-      if (user_id && conversation_id) {
+      if (conversation_id) {
         const { error } = await db.from("chat_history").insert({
-          user_id,
+          user_id: user_id || null,
           message: reply,
           sender: "bot",
           conversation_id
@@ -392,9 +394,9 @@ You are a professional customer support assistant.
     // SHORT RESPONSE
     reply = reply.split("\n").slice(0, 2).join(" ");
 
-    if (user_id && conversation_id) {
+    if (conversation_id) {
       const { error } = await db.from("chat_history").insert({
-        user_id,
+        user_id: user_id || null,
         message: reply,
         sender: "bot",
         conversation_id
