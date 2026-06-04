@@ -243,12 +243,6 @@ code {
 
 /* ✅ FIX: Reset button styles so inline styles in App.jsx are respected */
 button {
-  background: revert !important;
-  border: revert !important;
-  color: revert !important;
-  padding: revert !important;
-  border-radius: revert !important;
-  font-weight: revert !important;
-  font-size: revert !important;
-  cursor: pointer !important;
+  all: unset;
+  cursor: pointer;
 }

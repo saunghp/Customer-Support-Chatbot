@@ -10,6 +10,8 @@ app.use(express.json());
 
 // DEBUG ENV
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
+const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
+const OPENROUTER_MODEL = "openai/gpt-4o-mini";
 console.log("API KEY:", OPENROUTER_API_KEY ? "Loaded ✅" : "Missing ❌");
 
 // Supabase
@@ -18,39 +20,110 @@ const supabase = createClient(
   "sb_publishable_S8fprkNjVEng2HSvRsLogQ_Fyl9fuyi"
 );
 
-// TRANSLATION
-async function translateToEnglish(text) {
+function getSupabaseForRequest(req) {
+  const authHeader = req.headers.authorization;
+
+  if (!authHeader) {
+    return supabase;
+  }
+
+  return createClient(
+    "https://zzsawacervuerwraeifk.supabase.co",
+    "sb_publishable_S8fprkNjVEng2HSvRsLogQ_Fyl9fuyi",
+    {
+      global: {
+        headers: {
+          Authorization: authHeader
+        }
+      }
+    }
+  );
+}
+
+async function readJsonSafely(res) {
+  const text = await res.text();
+
+  if (!text) {
+    return null;
+  }
+
   try {
-    const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+    return JSON.parse(text);
+  } catch {
+    return { raw: text.slice(0, 500) };
+  }
+}
+
+async function callOpenRouter(messages) {
+  if (!OPENROUTER_API_KEY) {
+    return {
+      ok: false,
+      error: "OpenRouter API key is missing on the backend."
+    };
+  }
+
+  try {
+    const res = await fetch(OPENROUTER_URL, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${OPENROUTER_API_KEY}`,
-        "Content-Type": "application/json"
+        "Content-Type": "application/json",
+        "HTTP-Referer": "https://backend-jb86.onrender.com",
+        "X-Title": "Customer Support Chatbot"
       },
       body: JSON.stringify({
-        model: "openai/gpt-4o-mini",
-        messages: [
-          {
-            role: "system",
-            content: "Translate this to English. Only return the translation."
-          },
-          { role: "user", content: text }
-        ]
+        model: OPENROUTER_MODEL,
+        messages
       })
     });
 
-    const data = await res.json();
+    const data = await readJsonSafely(res);
 
     if (!res.ok) {
-      console.error("Translate error:", data);
-      return text;
+      return {
+        ok: false,
+        status: res.status,
+        error: data?.error?.message || data?.message || data?.raw || "OpenRouter request failed.",
+        data
+      };
     }
 
-    return data?.choices?.[0]?.message?.content || text;
+    const content = data?.choices?.[0]?.message?.content;
+
+    if (!content) {
+      return {
+        ok: false,
+        status: res.status,
+        error: "OpenRouter returned an empty response.",
+        data
+      };
+    }
+
+    return { ok: true, content, data };
   } catch (err) {
-    console.error("Translate crash:", err);
+    return {
+      ok: false,
+      error: err.message || "Could not reach OpenRouter."
+    };
+  }
+}
+
+// TRANSLATION
+async function translateToEnglish(text) {
+  const result = await callOpenRouter([
+    {
+      role: "system",
+      content: "Translate this to English. Only return the translation."
+    },
+    { role: "user", content: text }
+  ]);
+
+  if (!result.ok) {
+    console.error("Translate error:", result);
     return text;
   }
+
+  return result.content || text;
 }
 
 // LABELS
@@ -71,7 +144,12 @@ app.post("/labels", async (req, res) => {
 // CHAT
 app.post("/chat", async (req, res) => {
   try {
+    const db = getSupabaseForRequest(req);
     let { message, user_id, conversation_id: incomingConvId } = req.body;
+
+    if (!message || typeof message !== "string") {
+      return res.status(400).json({ reply: "Please type a message first." });
+    }
 
     let conversation_id = incomingConvId;
     const originalMessage = message;
@@ -81,7 +159,7 @@ app.post("/chat", async (req, res) => {
 
     if (user_id) {
       // ✅ FIX 1: destructure `error` properly
-      const { data, error } = await supabase
+      const { data, error } = await db
         .from("chat_history")
         .select("*")
         .eq("user_id", user_id)
@@ -109,7 +187,7 @@ app.post("/chat", async (req, res) => {
     // CREATE CONVERSATION
     if (!conversation_id && user_id) {
       // ✅ FIX 2: destructure `error` properly
-      const { data, error } = await supabase
+      const { data, error } = await db
         .from("conversations")
         .insert({
           user_id,
@@ -128,12 +206,16 @@ app.post("/chat", async (req, res) => {
 
     // SAVE USER MESSAGE
     if (user_id && conversation_id) {
-      await supabase.from("chat_history").insert({
+      const { error } = await db.from("chat_history").insert({
         user_id,
         message: originalMessage,
         sender: "user",
         conversation_id
       });
+
+      if (error) {
+        console.error("Saving user message failed:", error);
+      }
     }
 
     // TRACKING NUMBER
@@ -143,7 +225,7 @@ app.post("/chat", async (req, res) => {
       const trackingNumber = trackingMatch[0].toUpperCase();
 
       // ✅ FIX 3: destructure `error` properly
-      const { data, error } = await supabase
+      const { data, error } = await db
         .from("orders")
         .select("*")
         .ilike("tracking_number", trackingNumber);
@@ -158,12 +240,16 @@ app.post("/chat", async (req, res) => {
       }
 
       if (user_id && conversation_id) {
-        await supabase.from("chat_history").insert({
+        const { error } = await db.from("chat_history").insert({
           user_id,
           message: reply,
           sender: "bot",
           conversation_id
         });
+
+        if (error) {
+          console.error("Saving tracking reply failed:", error);
+        }
       }
 
       return res.json({ reply, conversation_id });
@@ -177,7 +263,7 @@ app.post("/chat", async (req, res) => {
         reply = "⚠️ Please login first";
       } else {
         // ✅ FIX 4: destructure `error` properly
-        const { data: orders, error: ordersError } = await supabase
+        const { data: orders, error: ordersError } = await db
           .from("orders")
           .select("*")
           .eq("user_id", user_id);
@@ -192,30 +278,26 @@ app.post("/chat", async (req, res) => {
       }
 
       if (user_id && conversation_id) {
-        await supabase.from("chat_history").insert({
+        const { error } = await db.from("chat_history").insert({
           user_id,
           message: reply,
           sender: "bot",
           conversation_id
         });
+
+        if (error) {
+          console.error("Saving order-list reply failed:", error);
+        }
       }
 
       return res.json({ reply, conversation_id });
     }
 
     // AI RESPONSE
-    const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${OPENROUTER_API_KEY}`,
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        model: "openai/gpt-4o-mini",
-        messages: [
-          {
-            role: "system",
-            content: `
+    const aiResult = await callOpenRouter([
+      {
+        role: "system",
+        content: `
 You are a professional customer support assistant.
 
 🌏 LANGUAGE:
@@ -238,18 +320,13 @@ You are a professional customer support assistant.
 - Give long explanations
 - Use lists or bullet points
 `
-          },
-          ...userHistory,
-          { role: "user", content: originalMessage }
-        ]
-      })
-    });
+      },
+      ...userHistory,
+      { role: "user", content: originalMessage }
+    ]);
 
-    const data = await response.json();
-    console.log("OpenRouter FULL response:", JSON.stringify(data, null, 2));
-
-    if (!response.ok) {
-      console.error("OpenRouter error:", data);
+    if (!aiResult.ok) {
+      console.error("OpenRouter error:", aiResult);
 
       return res.json({
         reply: "⚠️ AI is temporarily unavailable. Please try again."
@@ -257,6 +334,10 @@ You are a professional customer support assistant.
     }
 
     let reply = "⚠️ AI error";
+
+    const data = aiResult.data || {
+      choices: [{ message: { content: aiResult.content } }]
+    };
 
     if (data?.choices && data.choices.length > 0) {
       reply = data.choices[0]?.message?.content || reply;
@@ -266,12 +347,16 @@ You are a professional customer support assistant.
     reply = reply.split("\n").slice(0, 2).join(" ");
 
     if (user_id && conversation_id) {
-      await supabase.from("chat_history").insert({
+      const { error } = await db.from("chat_history").insert({
         user_id,
         message: reply,
         sender: "bot",
         conversation_id
       });
+
+      if (error) {
+        console.error("Saving bot reply failed:", error);
+      }
     }
 
     res.json({ reply, conversation_id });

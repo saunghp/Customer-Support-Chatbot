@@ -249,10 +249,14 @@ export default function App() {
     setLoading(true);
 
     try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const accessToken = sessionData.session?.access_token;
+
       const res = await fetch(`${API}/chat`, {
         method: "POST",
         headers: {
-          "Content-Type": "application/json"
+          "Content-Type": "application/json",
+          ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {})
         },
         body: JSON.stringify({
           message: messageToSend,
@@ -294,13 +298,23 @@ export default function App() {
         <h3 style={{ color: "white", margin: "0 0 10px 0" }}>Chats</h3>
 
         <button
-          style={{ width:"100%", padding:"12px", borderRadius:"12px", border:"1px solid #1f2937", background:"#1e293b", color:"white", fontWeight:"500", fontSize:"15px", display:"flex", alignItems:"center", justifyContent:"center", gap:"8px", cursor:"pointer" }}
+          style={styles.newChatBtn}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background =
+              "linear-gradient(135deg, #273449, #111827)";
+            e.currentTarget.style.transform = "translateY(-2px)";
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background =
+              "linear-gradient(135deg, #1e293b, #0f172a)";
+            e.currentTarget.style.transform = "translateY(0)";
+          }}
           onClick={() => {
             setMessages([
               {
                 text: "Hi there! 👋 I'm Aria, your virtual support assistant.",
-                sender: "bot"
-              }
+                sender: "bot",
+              },
             ]);
             setCurrentChat(null);
           }}
@@ -433,19 +447,23 @@ const styles = {
   },
   newChatBtn: {
     width: "100%",
-    padding: "12px",
-    borderRadius: "12px",
-    border: "1px solid #1f2937",
-    background: "linear-gradient(135deg,#1e293b,#0f172a)",
+    padding: "14px",
+    borderRadius: "16px",
+    border: "1px solid rgba(255,255,255,0.08)",
+    background: "linear-gradient(135deg, #1e293b, #0f172a)",
     color: "white",
     fontWeight: "500",
-    fontSize: "15px",
+    fontSize: "16px",
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
     gap: "8px",
     cursor: "pointer",
-    transition: "all 0.2s ease"
+    backdropFilter: "blur(10px)",
+    WebkitBackdropFilter: "blur(10px)",
+    boxShadow:
+      "inset 0 1px 1px rgba(255,255,255,0.05), 0 4px 20px rgba(0,0,0,0.4)",
+    transition: "all 0.25s ease",
   },
   chatList: {
     flex: 1,
@@ -455,17 +473,18 @@ const styles = {
   },
   chatItem: {
     width: "100%",
-    padding: "10px",
-    marginBottom: "6px",
-    borderRadius: "8px",
-    background: "#1f2937",
+    padding: "14px",
+    marginBottom: "10px",
+    borderRadius: "16px",
+    background: "linear-gradient(135deg,#1f2937,#111827)",
     color: "white",
     cursor: "pointer",
-    boxSizing: "border-box",
     display: "flex",
     justifyContent: "space-between",
     alignItems: "center",
-    fontSize: "13px"
+    fontSize: "14px",
+    boxShadow: "0 4px 12px rgba(0,0,0,0.35)",
+    transition: "all 0.2s ease",
   },
   sidebarBottom: {
     marginTop: "auto",
