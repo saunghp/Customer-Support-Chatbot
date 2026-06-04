@@ -192,18 +192,19 @@ app.post("/chat", async (req, res) => {
       user_id = authUser.id;
     }
 
-    let conversation_id = incomingConvId;
+    const safeUserId = user_id || null;
+    let convoId = incomingConvId || null;
     const originalMessage = message;
 
     // USER MEMORY
     let userHistory = [];
 
-    if (user_id) {
+    if (safeUserId) {
       // ✅ FIX 1: destructure `error` properly
       const { data, error } = await db
         .from("chat_history")
         .select("*")
-        .eq("user_id", user_id)
+        .eq("user_id", safeUserId)
         .order("created_at", { ascending: true });
 
       if (!error && data) {
@@ -226,13 +227,13 @@ app.post("/chat", async (req, res) => {
     const logicMessage = translatedMessage.toLowerCase();
 
     // CREATE CONVERSATION
-    if (!conversation_id) {
+    if (!convoId) {
       // ✅ FIX 2: destructure `error` properly
       const { data, error } = await db
         .from("conversations")
         .insert([
           {
-            user_id: user_id || null,
+            user_id: safeUserId,
             title: originalMessage.slice(0, 30)
           }
         ])
@@ -245,24 +246,23 @@ app.post("/chat", async (req, res) => {
           reply: `Could not create conversation: ${error?.message || "Unknown Supabase error"}`
         });
       } else {
-        conversation_id = data.id;
+        convoId = data.id;
       }
     }
 
     // SAVE USER MESSAGE
-    if (conversation_id) {
-      const { error } = await db.from("chat_history").insert({
-        user_id: user_id || null,
-        message: originalMessage,
-        sender: "user",
-        conversation_id
-      });
+    if (convoId) {
+      const { error } = await db.from("chat_history").insert([
+        {
+          user_id: safeUserId,
+          conversation_id: convoId,
+          message: originalMessage,
+          sender: "user"
+        }
+      ]);
 
       if (error) {
         console.error("Saving user message failed:", error);
-        return res.status(500).json({
-          reply: `Could not save your message: ${error.message}`
-        });
       }
     }
 
@@ -287,12 +287,12 @@ app.post("/chat", async (req, res) => {
         reply = `📦 ${order.product_name} — ${order.status}`;
       }
 
-      if (conversation_id) {
+      if (convoId) {
         const { error } = await db.from("chat_history").insert({
-          user_id: user_id || null,
+          user_id: safeUserId,
           message: reply,
           sender: "bot",
-          conversation_id
+          conversation_id: convoId
         });
 
         if (error) {
@@ -300,21 +300,21 @@ app.post("/chat", async (req, res) => {
         }
       }
 
-      return res.json({ reply, conversation_id });
+      return res.json({ reply, conversation_id: convoId });
     }
 
     // ORDER LIST
     if (logicMessage.includes("track")) {
       let reply;
 
-      if (!user_id) {
+      if (!safeUserId) {
         reply = "⚠️ Please login first";
       } else {
         // ✅ FIX 4: destructure `error` properly
         const { data: orders, error: ordersError } = await db
           .from("orders")
           .select("*")
-          .eq("user_id", user_id);
+          .eq("user_id", safeUserId);
 
         if (ordersError || !orders || orders.length === 0) {
           reply = "📦 You have no orders yet.";
@@ -325,12 +325,12 @@ app.post("/chat", async (req, res) => {
         }
       }
 
-      if (conversation_id) {
+      if (convoId) {
         const { error } = await db.from("chat_history").insert({
-          user_id: user_id || null,
+          user_id: safeUserId,
           message: reply,
           sender: "bot",
-          conversation_id
+          conversation_id: convoId
         });
 
         if (error) {
@@ -338,7 +338,7 @@ app.post("/chat", async (req, res) => {
         }
       }
 
-      return res.json({ reply, conversation_id });
+      return res.json({ reply, conversation_id: convoId });
     }
 
     // AI RESPONSE
@@ -394,12 +394,12 @@ You are a professional customer support assistant.
     // SHORT RESPONSE
     reply = reply.split("\n").slice(0, 2).join(" ");
 
-    if (conversation_id) {
+    if (convoId) {
       const { error } = await db.from("chat_history").insert({
-        user_id: user_id || null,
+        user_id: safeUserId,
         message: reply,
         sender: "bot",
-        conversation_id
+        conversation_id: convoId
       });
 
       if (error) {
@@ -407,7 +407,7 @@ You are a professional customer support assistant.
       }
     }
 
-    res.json({ reply, conversation_id });
+    res.json({ reply, conversation_id: convoId });
 
   } catch (err) {
     console.error("CHAT ERROR:", err);

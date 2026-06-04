@@ -1,7 +1,9 @@
 import { useState, useRef, useEffect } from "react";
 import { supabase } from "./supabase";
 
-const API = "https://backend-jb86.onrender.com";
+const API = import.meta.env.DEV
+  ? "http://localhost:3000"
+  : "https://backend-jb86.onrender.com";
 
 // ✅ FIX: Simple inline delete button — removes broken NativeDelete import
 function DeleteButton({ onDelete }) {
